@@ -72,7 +72,8 @@
 
               <div v-else-if="!gameStore.isCheckInAllowed()" class="time-restriction">
                 <ion-text color="danger">
-                  <p>Check-in is only available between 8:00 AM and 6:00 PM</p>
+                  <p> Check-in is only available between 8:00 AM and 6:00 PM. <br></br><br></br> The
+                  check-in system will appear between that timeframe.</p>
                 </ion-text>
               </div>
 
@@ -99,22 +100,24 @@
                 </ion-button>
               </div>
 
-              <TeamRoster v-if="balancedTeams" :darkTeam="balancedTeams.darkTeam" :lightTeam="balancedTeams.lightTeam" :isAdmin="authStore.isAdmin" />
+              <div v-if="gameStore.isCheckInAllowed()">
+                <TeamRoster v-if="balancedTeams" :darkTeam="balancedTeams.darkTeam" :lightTeam="balancedTeams.lightTeam" :isAdmin="authStore.isAdmin" />
 
-              <div class="waitlist-section">
-                <h3>Waitlist ({{ gameStore.currentGame.waitlist?.length || 0 }})</h3>
-                <ion-list>
-                  <ion-item v-for="(player, index) in gameStore.currentGame.waitlist" :key="player.uid">
-                    <div slot="start" class="waitlist-number">{{ index + 1 }}</div>
-                    <ion-label>
-                      <p><span class="player-name">{{ player.name }}</span> - {{ player.position }}<span v-if="authStore.isAdmin"> - Skill Level {{ player.skillLevel || 2 }}</span></p>
-                    </ion-label>
-                    <div slot="end" class="waitlist-time">{{ formatCheckInTime(player.checkedInAt) }}</div>
-                  </ion-item>
-                  <ion-item v-if="!gameStore.currentGame.waitlist?.length">
-                    <ion-label color="medium">No players on waitlist</ion-label>
-                  </ion-item>
-                </ion-list>
+                <div class="waitlist-section">
+                  <h3>Waitlist ({{ gameStore.currentGame.waitlist?.length || 0 }})</h3>
+                  <ion-list>
+                    <ion-item v-for="(player, index) in gameStore.currentGame.waitlist" :key="player.uid">
+                      <div slot="start" class="waitlist-number">{{ index + 1 }}</div>
+                      <ion-label>
+                        <p><span class="player-name">{{ player.name }}</span> - {{ player.position }}<span v-if="authStore.isAdmin"> - Skill Level {{ player.skillLevel || 2 }}</span></p>
+                      </ion-label>
+                      <div slot="end" class="waitlist-time">{{ formatCheckInTime(player.checkedInAt) }}</div>
+                    </ion-item>
+                    <ion-item v-if="!gameStore.currentGame.waitlist?.length">
+                      <ion-label color="medium">No players on waitlist</ion-label>
+                    </ion-item>
+                  </ion-list>
+                </div>
               </div>
             </div>
 

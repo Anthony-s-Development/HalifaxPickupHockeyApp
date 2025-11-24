@@ -25,7 +25,8 @@
           <ion-card-content>
             <div v-if="!gameStore.isCheckInAllowed()" class="time-restriction">
               <ion-text color="danger">
-                <p>Check-in is only available between 8:00 AM and 6:00 PM</p>
+                  <p> Check-in is only available between 8:00 AM and 6:00 PM. <br></br><br></br> The
+                  check-in system will appear between that timeframe.</p>
               </ion-text>
             </div>
 
