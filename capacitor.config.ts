@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.halifaxpickuphockey.app',
+  appId: 'com.halifaxpickuphockeyhfx.app',
   appName: 'Halifax Pickup Hockey',
   webDir: 'dist',
   server: {
