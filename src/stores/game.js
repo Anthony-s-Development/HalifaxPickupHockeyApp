@@ -12,7 +12,8 @@ import {
   increment,
   query,
   where,
-  getDocs
+  getDocs,
+  orderBy
 } from 'firebase/firestore'
 import { db } from '@/config/firebase'
 import { useAuthStore } from './auth'
@@ -21,9 +22,12 @@ export const useGameStore = defineStore('game', () => {
   const games = ref([])
   const currentGame = ref(null)
   const loading = ref(false)
+  const schedulesLoaded = ref(false)
   let unsubscribeGame = null
+  let unsubscribeSchedules = null
 
-  const GAME_SCHEDULES = {
+  // Default schedules (fallback if Firestore hasn't loaded)
+  const DEFAULT_SCHEDULES = {
     monday_11pm_forum: { day: 1, time: '23:00', venue: 'Forum' },
     tuesday_1030pm_forum: { day: 2, time: '22:30', venue: 'Forum' },
     thursday_1030pm_civic: { day: 4, time: '22:30', venue: 'Civic' },
@@ -31,13 +35,78 @@ export const useGameStore = defineStore('game', () => {
     saturday_1030pm_forum: { day: 6, time: '22:30', venue: 'Forum' }
   }
 
+  // Dynamic schedules loaded from Firestore
+  const gameSchedules = ref({ ...DEFAULT_SCHEDULES })
+
+  // Legacy export for backward compatibility
+  const GAME_SCHEDULES = gameSchedules
+
+  const subscribeToSchedules = () => {
+    // Unsubscribe from existing listener if any
+    if (unsubscribeSchedules) {
+      unsubscribeSchedules()
+    }
+
+    return new Promise((resolve) => {
+      try {
+        const schedulesRef = collection(db, 'gameSchedules')
+        const q = query(schedulesRef, orderBy('order', 'asc'))
+        let isFirstSnapshot = true
+
+        unsubscribeSchedules = onSnapshot(q, (querySnapshot) => {
+          if (!querySnapshot.empty) {
+            const schedules = {}
+            querySnapshot.docs.forEach(doc => {
+              const data = doc.data()
+              if (data.isActive) {
+                schedules[doc.id] = {
+                  day: data.dayOfWeek,
+                  time: data.time,
+                  venue: data.venue
+                }
+              }
+            })
+            gameSchedules.value = schedules
+          }
+          schedulesLoaded.value = true
+
+          // Resolve the promise after first snapshot
+          if (isFirstSnapshot) {
+            isFirstSnapshot = false
+            resolve({ success: true })
+          }
+        }, (error) => {
+          // Fall back to defaults if Firestore fails
+          console.error('Error subscribing to schedules:', error)
+          schedulesLoaded.value = true
+          if (isFirstSnapshot) {
+            isFirstSnapshot = false
+            resolve({ success: false, error: error.message })
+          }
+        })
+      } catch (error) {
+        // Fall back to defaults if Firestore fails
+        schedulesLoaded.value = true
+        resolve({ success: false, error: error.message })
+      }
+    })
+  }
+
+  const stopSchedulesListener = () => {
+    if (unsubscribeSchedules) {
+      unsubscribeSchedules()
+      unsubscribeSchedules = null
+    }
+  }
+
   const getTodayGameId = () => {
     const now = new Date()
     const dayOfWeek = now.getDay()
     const dateString = now.toISOString().split('T')[0]
 
-    const gameKey = Object.keys(GAME_SCHEDULES).find(key => {
-      return GAME_SCHEDULES[key].day === dayOfWeek
+    const schedules = gameSchedules.value
+    const gameKey = Object.keys(schedules).find(key => {
+      return schedules[key].day === dayOfWeek
     })
 
     return gameKey ? `${dateString}_${gameKey}` : null
@@ -47,8 +116,9 @@ export const useGameStore = defineStore('game', () => {
     const now = new Date()
     const dayOfWeek = now.getDay()
 
-    return Object.keys(GAME_SCHEDULES).find(key => {
-      return GAME_SCHEDULES[key].day === dayOfWeek
+    const schedules = gameSchedules.value
+    return Object.keys(schedules).find(key => {
+      return schedules[key].day === dayOfWeek
     })
   }
 
@@ -74,7 +144,7 @@ export const useGameStore = defineStore('game', () => {
 
       if (!docSnap.exists()) {
         const scheduleKey = getTodayGameScheduleKey()
-        const schedule = GAME_SCHEDULES[scheduleKey]
+        const schedule = gameSchedules.value[scheduleKey]
 
         const newGame = {
           date: new Date().toISOString().split('T')[0],
@@ -301,7 +371,11 @@ export const useGameStore = defineStore('game', () => {
     games,
     currentGame,
     loading,
+    schedulesLoaded,
+    gameSchedules,
     GAME_SCHEDULES,
+    subscribeToSchedules,
+    stopSchedulesListener,
     getTodayGameId,
     isCheckInAllowed,
     loadTodayGame,

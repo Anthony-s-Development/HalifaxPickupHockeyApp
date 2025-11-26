@@ -6,6 +6,8 @@ import {
   getDocs,
   getDoc,
   updateDoc,
+  setDoc,
+  deleteDoc,
   onSnapshot,
   query,
   where,
@@ -19,9 +21,73 @@ import { db } from '@/config/firebase'
 export const useAdminStore = defineStore('admin', () => {
   const allGames = ref([])
   const allUsers = ref([])
+  const gameSchedules = ref([])
   const selectedGame = ref(null)
   const loading = ref(false)
   let unsubscribeGame = null
+
+  const loadGameSchedules = async () => {
+    try {
+      const schedulesRef = collection(db, 'gameSchedules')
+      const q = query(schedulesRef, orderBy('order', 'asc'))
+      const querySnapshot = await getDocs(q)
+
+      gameSchedules.value = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }))
+
+      return { success: true }
+    } catch (error) {
+      return { success: false, error: error.message }
+    }
+  }
+
+  const updateGameSchedule = async (scheduleId, scheduleData) => {
+    try {
+      const docRef = doc(db, 'gameSchedules', scheduleId)
+      await updateDoc(docRef, {
+        ...scheduleData,
+        updatedAt: new Date().toISOString()
+      })
+
+      await loadGameSchedules()
+      return { success: true }
+    } catch (error) {
+      return { success: false, error: error.message }
+    }
+  }
+
+  const addGameSchedule = async (scheduleData) => {
+    try {
+      const scheduleId = `${scheduleData.dayName.toLowerCase()}_${scheduleData.time.replace(':', '')}${scheduleData.time.includes('23') ? 'pm' : scheduleData.time.includes('22') ? 'pm' : 'pm'}_${scheduleData.venue.toLowerCase()}`
+      const docRef = doc(db, 'gameSchedules', scheduleId)
+
+      await setDoc(docRef, {
+        id: scheduleId,
+        ...scheduleData,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      })
+
+      await loadGameSchedules()
+      return { success: true }
+    } catch (error) {
+      return { success: false, error: error.message }
+    }
+  }
+
+  const deleteGameSchedule = async (scheduleId) => {
+    try {
+      const docRef = doc(db, 'gameSchedules', scheduleId)
+      await deleteDoc(docRef)
+
+      await loadGameSchedules()
+      return { success: true }
+    } catch (error) {
+      return { success: false, error: error.message }
+    }
+  }
 
   const loadAllGames = async () => {
     loading.value = true
@@ -305,10 +371,15 @@ export const useAdminStore = defineStore('admin', () => {
   return {
     allGames,
     allUsers,
+    gameSchedules,
     selectedGame,
     loading,
     loadAllGames,
     loadAllUsers,
+    loadGameSchedules,
+    updateGameSchedule,
+    addGameSchedule,
+    deleteGameSchedule,
     loadGameById,
     stopGameListener,
     movePlayerFromWaitlist,

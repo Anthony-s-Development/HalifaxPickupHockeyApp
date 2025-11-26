@@ -186,6 +186,23 @@
           <ion-card-content>
             <ion-list>
               <ion-item>
+                <ion-label>Sunday 10:30 PM - Forum</ion-label>
+                <ion-badge
+                  :color="
+                    authStore.userProfile.regulars?.sunday_1030pm_forum
+                      ? 'success'
+                      : 'medium'
+                  "
+                >
+                  {{
+                    authStore.userProfile.regulars?.sunday_1030pm_forum
+                      ? "Regular"
+                      : "Not Regular"
+                  }}
+                </ion-badge>
+              </ion-item>
+
+              <ion-item>
                 <ion-label>Monday 11:00 PM - Forum</ion-label>
                 <ion-badge
                   :color="
@@ -213,6 +230,23 @@
                 >
                   {{
                     authStore.userProfile.regulars?.tuesday_1030pm_forum
+                      ? "Regular"
+                      : "Not Regular"
+                  }}
+                </ion-badge>
+              </ion-item>
+
+              <ion-item>
+                <ion-label>Wednesday 10:30 PM - Forum</ion-label>
+                <ion-badge
+                  :color="
+                    authStore.userProfile.regulars?.wednesday_1030pm_forum
+                      ? 'success'
+                      : 'medium'
+                  "
+                >
+                  {{
+                    authStore.userProfile.regulars?.wednesday_1030pm_forum
                       ? "Regular"
                       : "Not Regular"
                   }}
