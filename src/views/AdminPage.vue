@@ -20,6 +20,9 @@
           <ion-segment-button value="users">
             <ion-label>Users</ion-label>
           </ion-segment-button>
+          <ion-segment-button value="schedules">
+            <ion-label>Schedules</ion-label>
+          </ion-segment-button>
           <ion-segment-button value="history">
             <ion-label>History</ion-label>
           </ion-segment-button>
@@ -208,6 +211,108 @@
           </div>
         </div>
 
+        <div v-if="selectedTab === 'schedules'" class="tab-content schedules-tab">
+          <h2>Game Schedules</h2>
+
+          <ion-button
+            @click="loadSchedules"
+            expand="block"
+            class="ion-margin-bottom"
+          >
+            <ion-icon :icon="refreshOutline" slot="start"></ion-icon>
+            Refresh Schedules
+          </ion-button>
+
+          <ion-card v-for="schedule in adminStore.gameSchedules" :key="schedule.id">
+            <ion-card-header>
+              <ion-card-title>{{ schedule.dayName }} {{ schedule.displayTime }}</ion-card-title>
+              <ion-card-subtitle>{{ schedule.venue }}</ion-card-subtitle>
+            </ion-card-header>
+            <ion-card-content>
+              <div class="schedule-details">
+                <ion-badge :color="schedule.isActive ? 'success' : 'medium'">
+                  {{ schedule.isActive ? 'Active' : 'Inactive' }}
+                </ion-badge>
+              </div>
+
+              <div class="schedule-actions">
+                <ion-button
+                  fill="outline"
+                  size="small"
+                  @click="toggleScheduleStatus(schedule)"
+                >
+                  {{ schedule.isActive ? 'Deactivate' : 'Activate' }}
+                </ion-button>
+                <ion-button
+                  fill="outline"
+                  size="small"
+                  @click="editSchedule(schedule)"
+                >
+                  <ion-icon :icon="createOutline" slot="start"></ion-icon>
+                  Edit
+                </ion-button>
+                <ion-button
+                  fill="outline"
+                  size="small"
+                  color="danger"
+                  @click="deleteSchedule(schedule)"
+                >
+                  <ion-icon :icon="trashOutline" slot="start"></ion-icon>
+                  Delete
+                </ion-button>
+              </div>
+            </ion-card-content>
+          </ion-card>
+
+          <div
+            v-if="adminStore.gameSchedules.length === 0 && !adminStore.loading"
+            class="empty-state"
+          >
+            <ion-text color="medium">
+              <p>No schedules found. Click "Refresh Schedules" to load.</p>
+            </ion-text>
+          </div>
+
+          <ion-card class="add-schedule-card">
+            <ion-card-header>
+              <ion-card-title>Add New Schedule</ion-card-title>
+            </ion-card-header>
+            <ion-card-content>
+              <ion-item>
+                <ion-label position="floating">Day of Week</ion-label>
+                <ion-select v-model="newSchedule.dayOfWeek" interface="popover">
+                  <ion-select-option :value="0">Sunday</ion-select-option>
+                  <ion-select-option :value="1">Monday</ion-select-option>
+                  <ion-select-option :value="2">Tuesday</ion-select-option>
+                  <ion-select-option :value="3">Wednesday</ion-select-option>
+                  <ion-select-option :value="4">Thursday</ion-select-option>
+                  <ion-select-option :value="5">Friday</ion-select-option>
+                  <ion-select-option :value="6">Saturday</ion-select-option>
+                </ion-select>
+              </ion-item>
+
+              <ion-item>
+                <ion-label position="floating">Time (24h format, e.g. 22:30)</ion-label>
+                <ion-input v-model="newSchedule.time" placeholder="22:30"></ion-input>
+              </ion-item>
+
+              <ion-item>
+                <ion-label position="floating">Venue</ion-label>
+                <ion-input v-model="newSchedule.venue" placeholder="Forum"></ion-input>
+              </ion-item>
+
+              <ion-button
+                expand="block"
+                class="ion-margin-top"
+                @click="addNewSchedule"
+                :disabled="!newSchedule.time || !newSchedule.venue"
+              >
+                Add Schedule
+              </ion-button>
+            </ion-card-content>
+          </ion-card>
+        </div>
+
         <div v-if="selectedTab === 'history'" class="tab-content">
           <h2>Game History</h2>
 
@@ -295,6 +400,9 @@ import {
   IonSegmentButton,
   IonIcon,
   IonSearchbar,
+  IonSelect,
+  IonSelectOption,
+  IonInput,
   toastController,
   alertController,
 } from "@ionic/vue";
@@ -304,6 +412,7 @@ import {
   checkmarkCircleOutline,
   createOutline,
   peopleOutline,
+  trashOutline,
 } from "ionicons/icons";
 import { ref, computed, onMounted, watch } from "vue";
 import { useRouter } from "vue-router";
@@ -313,6 +422,11 @@ const router = useRouter();
 const adminStore = useAdminStore();
 const selectedTab = ref("games");
 const userSearchQuery = ref("");
+const newSchedule = ref({
+  dayOfWeek: 0,
+  time: "",
+  venue: "",
+});
 
 onMounted(() => {
   loadGames();
@@ -344,6 +458,9 @@ watch(selectedTab, (newTab) => {
   if (newTab === "users" && adminStore.allUsers.length === 0) {
     loadUsers();
   }
+  if (newTab === "schedules" && adminStore.gameSchedules.length === 0) {
+    loadSchedules();
+  }
 });
 
 const loadGames = async () => {
@@ -367,6 +484,163 @@ const loadUsers = async () => {
       color: "danger",
     });
     await toast.present();
+  }
+};
+
+const loadSchedules = async () => {
+  const result = await adminStore.loadGameSchedules();
+  if (!result.success) {
+    const toast = await toastController.create({
+      message: "Failed to load schedules",
+      duration: 2000,
+      color: "danger",
+    });
+    await toast.present();
+  }
+};
+
+const toggleScheduleStatus = async (schedule) => {
+  const result = await adminStore.updateGameSchedule(schedule.id, {
+    isActive: !schedule.isActive,
+  });
+
+  const toast = await toastController.create({
+    message: result.success
+      ? `Schedule ${schedule.isActive ? "deactivated" : "activated"}!`
+      : "Failed to update schedule",
+    duration: 2000,
+    color: result.success ? "success" : "danger",
+  });
+  await toast.present();
+};
+
+const editSchedule = async (schedule) => {
+  const alert = await alertController.create({
+    header: "Edit Schedule",
+    inputs: [
+      {
+        name: "time",
+        type: "text",
+        placeholder: "Time (24h format, e.g. 22:30)",
+        value: schedule.time,
+      },
+      {
+        name: "venue",
+        type: "text",
+        placeholder: "Venue",
+        value: schedule.venue,
+      },
+    ],
+    buttons: [
+      {
+        text: "Cancel",
+        role: "cancel",
+      },
+      {
+        text: "Save",
+        handler: async (data) => {
+          const displayTime = formatDisplayTime(data.time);
+          const result = await adminStore.updateGameSchedule(schedule.id, {
+            time: data.time,
+            venue: data.venue,
+            displayTime: displayTime,
+          });
+
+          const toast = await toastController.create({
+            message: result.success
+              ? "Schedule updated!"
+              : "Failed to update schedule",
+            duration: 2000,
+            color: result.success ? "success" : "danger",
+          });
+          await toast.present();
+        },
+      },
+    ],
+  });
+
+  await alert.present();
+};
+
+const formatDisplayTime = (time) => {
+  if (!time) return "";
+  const [hours, minutes] = time.split(":");
+  const hour = parseInt(hours);
+  const ampm = hour >= 12 ? "PM" : "AM";
+  const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
+  return `${displayHour}:${minutes} ${ampm}`;
+};
+
+const deleteSchedule = async (schedule) => {
+  const alert = await alertController.create({
+    header: "Delete Schedule",
+    message: `Are you sure you want to delete the ${schedule.dayName} ${schedule.displayTime} schedule at ${schedule.venue}? This cannot be undone.`,
+    buttons: [
+      {
+        text: "Cancel",
+        role: "cancel",
+      },
+      {
+        text: "Delete",
+        role: "destructive",
+        cssClass: "danger-button",
+        handler: async () => {
+          const result = await adminStore.deleteGameSchedule(schedule.id);
+
+          const toast = await toastController.create({
+            message: result.success
+              ? "Schedule deleted!"
+              : "Failed to delete schedule",
+            duration: 2000,
+            color: result.success ? "success" : "danger",
+          });
+          await toast.present();
+        },
+      },
+    ],
+  });
+
+  await alert.present();
+};
+
+const addNewSchedule = async () => {
+  const days = [
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+  ];
+  const dayName = days[newSchedule.value.dayOfWeek];
+  const displayTime = formatDisplayTime(newSchedule.value.time);
+
+  const scheduleData = {
+    dayOfWeek: newSchedule.value.dayOfWeek,
+    dayName: dayName,
+    time: newSchedule.value.time,
+    displayTime: displayTime,
+    venue: newSchedule.value.venue,
+    isActive: true,
+    order: newSchedule.value.dayOfWeek,
+  };
+
+  const result = await adminStore.addGameSchedule(scheduleData);
+
+  const toast = await toastController.create({
+    message: result.success ? "Schedule added!" : "Failed to add schedule",
+    duration: 2000,
+    color: result.success ? "success" : "danger",
+  });
+  await toast.present();
+
+  if (result.success) {
+    newSchedule.value = {
+      dayOfWeek: 0,
+      time: "",
+      venue: "",
+    };
   }
 };
 
@@ -615,24 +889,63 @@ h2 {
   padding: 0;
 }
 
+/* Schedules tab styles */
+.schedules-tab {
+  display: flex;
+  flex-direction: column;
+}
+
+.schedule-details {
+  margin-bottom: 1rem;
+}
+
+.schedule-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.add-schedule-card {
+  margin-top: 1rem;
+  border: 2px dashed var(--ion-color-medium);
+}
+
 @media (min-width: 768px) {
-  .tab-content:not(.users-tab) {
+  .tab-content:not(.users-tab):not(.schedules-tab) {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(450px, 1fr));
     gap: 1rem;
   }
 
-  .tab-content:not(.users-tab) > ion-button {
+  .tab-content:not(.users-tab):not(.schedules-tab) > ion-button {
     grid-column: 1 / -1;
   }
 
-  .tab-content:not(.users-tab) > .empty-state {
+  .tab-content:not(.users-tab):not(.schedules-tab) > .empty-state {
+    grid-column: 1 / -1;
+  }
+
+  .schedules-tab {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 1rem;
+  }
+
+  .schedules-tab > ion-button {
+    grid-column: 1 / -1;
+  }
+
+  .schedules-tab > .empty-state {
+    grid-column: 1 / -1;
+  }
+
+  .schedules-tab > .add-schedule-card {
     grid-column: 1 / -1;
   }
 }
 
 @media (min-width: 1200px) {
-  .tab-content:not(.users-tab) {
+  .tab-content:not(.users-tab):not(.schedules-tab) {
     grid-template-columns: repeat(2, 1fr);
   }
 }

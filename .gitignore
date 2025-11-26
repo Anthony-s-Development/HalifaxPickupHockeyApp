@@ -34,3 +34,5 @@ ios/
 
 resources/ios/**/*
 resources/android/**/*
+
+serviceAccountKey.json

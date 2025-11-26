@@ -99,6 +99,14 @@
           </ion-card-header>
           <ion-card-content>
             <ion-item lines="none">
+              <ion-label>Sunday 10:30 PM - Forum</ion-label>
+              <ion-checkbox
+                slot="end"
+                v-model="user.regulars.sunday_1030pm_forum"
+              ></ion-checkbox>
+            </ion-item>
+
+            <ion-item lines="none">
               <ion-label>Monday 11:00 PM - Forum</ion-label>
               <ion-checkbox
                 slot="end"
@@ -111,6 +119,14 @@
               <ion-checkbox
                 slot="end"
                 v-model="user.regulars.tuesday_1030pm_forum"
+              ></ion-checkbox>
+            </ion-item>
+
+            <ion-item lines="none">
+              <ion-label>Wednesday 10:30 PM - Forum</ion-label>
+              <ion-checkbox
+                slot="end"
+                v-model="user.regulars.wednesday_1030pm_forum"
               ></ion-checkbox>
             </ion-item>
 

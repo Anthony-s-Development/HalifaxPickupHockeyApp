@@ -5,6 +5,7 @@ A cross-platform application for managing Halifax Pickup Hockey league check-ins
 ## Features
 
 ### Player Features
+
 - User authentication with Firebase Auth (Email/Password)
 - Player profiles with position, skill level, and regular night preferences
 - Game check-in/check-out functionality with time restrictions (8 AM - 6 PM)
@@ -15,7 +16,8 @@ A cross-platform application for managing Halifax Pickup Hockey league check-ins
 - Next game date display when no game is scheduled
 
 ### Admin Features
-- Comprehensive admin dashboard with Games, Users, and History tabs
+
+- Comprehensive admin dashboard with Games, Users, Schedules, and History tabs
 - Real-time game management with live player lists
 - Drag-and-drop team assignment (desktop) and tap-to-move (mobile)
 - Auto-balance teams by skill level and position
@@ -24,9 +26,11 @@ A cross-platform application for managing Halifax Pickup Hockey league check-ins
 - Mark games as completed and automatically update player statistics
 - User management with search functionality
 - Edit user profiles including regulars, admin status, and skate passes
+- **Dynamic game schedule management** - add, edit, activate/deactivate, and delete schedules
 - View game history and completed games
 
 ### Platform Support
+
 - Responsive design for iOS, Android, and Desktop
 - Native mobile interactions with action sheets
 - Touch-friendly interfaces for all mobile operations
@@ -44,11 +48,15 @@ A cross-platform application for managing Halifax Pickup Hockey league check-ins
 
 ## Game Schedule
 
+Game schedules are stored in Firebase Firestore and can be managed dynamically through the admin dashboard. Default schedules include:
+
 - Monday 11:00 PM - Forum
 - Tuesday 10:30 PM - Forum
 - Thursday 10:30 PM - Civic
 - Friday 10:30 PM - Forum
 - Saturday 10:30 PM - Forum
+
+Schedules can be added, edited, activated/deactivated, or deleted in real-time. Changes automatically update across all connected clients.
 
 ## Setup Instructions
 
@@ -150,10 +158,12 @@ npx cap open android
   email: string,
   name: string,
   position: 'Forward' | 'Defense' | 'Goalie',
-  skillLevel: 1 | 3 | 5,
+  skillLevel: 1 | 2 | 3,
   regulars: {
+    sunday_1030pm_forum: boolean,
     monday_11pm_forum: boolean,
     tuesday_1030pm_forum: boolean,
+    wednesday_1030pm_forum: boolean,
     thursday_1030pm_civic: boolean,
     friday_1030pm_forum: boolean,
     saturday_1030pm_forum: boolean
@@ -200,11 +210,28 @@ npx cap open android
 }
 ```
 
+### Game Schedule
+
+```javascript
+{
+  id: string,                    // e.g., 'monday_11pm_forum'
+  dayOfWeek: number,             // 0 (Sunday) - 6 (Saturday)
+  dayName: string,               // e.g., 'Monday'
+  time: string,                  // 24h format, e.g., '23:00'
+  displayTime: string,           // e.g., '11:00 PM'
+  venue: string,                 // e.g., 'Forum'
+  isActive: boolean,             // Whether this schedule is currently active
+  order: number,                 // Sort order (typically same as dayOfWeek)
+  createdAt: string (ISO date),
+  updatedAt: string (ISO date)
+}
+```
+
 ## Skill Levels
 
 - **Level 1**: Basic skating ability but struggles with backward skating and crossovers
-- **Level 3**: A good mix of basic skills, decent knowledge of the game, and athletic ability
-- **Level 5**: Advanced skills, strong physical shape, and a high understanding of the game
+- **Level 2**: A good mix of basic skills, decent knowledge of the game, and athletic ability
+- **Level 3**: Advanced skills, strong physical shape, and a high understanding of the game
 
 ## Security Features
 

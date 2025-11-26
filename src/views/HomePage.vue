@@ -30,29 +30,9 @@
             </div>
             <h2 class="section-title">Weekly Schedule</h2>
             <ion-list class="schedule-list">
-              <ion-item>
+              <ion-item v-for="schedule in sortedSchedules" :key="schedule.key">
                 <ion-label>
-                  <p><span class="day-name">Monday</span> - 11:00 PM - Forum</p>
-                </ion-label>
-              </ion-item>
-              <ion-item>
-                <ion-label>
-                  <p><span class="day-name">Tuesday</span> - 10:30 PM - Forum</p>
-                </ion-label>
-              </ion-item>
-              <ion-item>
-                <ion-label>
-                  <p><span class="day-name">Thursday</span> - 10:30 PM - Civic</p>
-                </ion-label>
-              </ion-item>
-              <ion-item>
-                <ion-label>
-                  <p><span class="day-name">Friday</span> - 10:30 PM - Forum</p>
-                </ion-label>
-              </ion-item>
-              <ion-item>
-                <ion-label>
-                  <p><span class="day-name">Saturday</span> - 10:30 PM - Forum</p>
+                  <p><span class="day-name">{{ schedule.dayName }}</span> - {{ formatTime(schedule.time) }} - {{ schedule.venue }}</p>
                 </ion-label>
               </ion-item>
             </ion-list>
@@ -151,7 +131,7 @@ import {
   IonMenuButton,
   toastController
 } from '@ionic/vue'
-import { onMounted, ref, computed } from 'vue'
+import { onMounted, onUnmounted, ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useGameStore } from '@/stores/game'
@@ -169,8 +149,26 @@ const balancedTeams = computed(() => {
   return gameStore.balanceTeams(gameStore.currentGame.players)
 })
 
+const sortedSchedules = computed(() => {
+  const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+  const schedules = gameStore.gameSchedules
+
+  return Object.entries(schedules)
+    .map(([key, schedule]) => ({
+      key,
+      dayName: dayNames[schedule.day],
+      day: schedule.day,
+      time: schedule.time,
+      venue: schedule.venue
+    }))
+    .sort((a, b) => a.day - b.day)
+})
+
 const nextGameDate = computed(() => {
-  const gameDays = [1, 2, 4, 5, 6]
+  // Get active game days from the dynamic schedules
+  const schedules = gameStore.gameSchedules
+  const gameDays = Object.values(schedules).map(s => s.day)
+
   const today = new Date()
   const currentDay = today.getDay()
 
@@ -209,7 +207,13 @@ const nextGameDate = computed(() => {
 })
 
 onMounted(async () => {
+  await gameStore.subscribeToSchedules()
   await gameStore.loadTodayGame()
+})
+
+onUnmounted(() => {
+  gameStore.stopSchedulesListener()
+  gameStore.stopGameListener()
 })
 
 const getTodayGameTitle = () => {
