@@ -27,7 +27,23 @@
     </ion-header>
 
     <ion-content class="ion-padding">
+      <!-- Pull to Refresh -->
+      <ion-refresher slot="fixed" @ionRefresh="handleRefresh($event)">
+        <ion-refresher-content
+          pulling-text="Pull to refresh"
+          refreshing-spinner="circles"
+          refreshing-text="Refreshing..."
+        ></ion-refresher-content>
+      </ion-refresher>
+
       <div class="content-container">
+        <!-- Stale Data Warning -->
+        <div v-if="gameStore.isDataStale && gameStore.currentGame" class="stale-warning" @click="manualRefresh">
+          <ion-icon :icon="alertCircleOutline"></ion-icon>
+          <span>Data may be out of date. Pull down to refresh.</span>
+          <span class="last-updated">Updated {{ gameStore.timeSinceRefresh }}</span>
+        </div>
+
         <div class="cards-layout">
           <!-- Weekly Schedule -->
           <div class="schedule-section">
@@ -60,7 +76,12 @@
           <!-- Game Section -->
           <div class="game-section">
             <div v-if="gameStore.currentGame">
-              <h2 class="section-title">{{ getTodayGameTitle() }}</h2>
+              <div class="game-header">
+                <h2 class="section-title">{{ getTodayGameTitle() }}</h2>
+                <span v-if="gameStore.lastRefreshed && !gameStore.isDataStale" class="last-refreshed">
+                  Updated {{ gameStore.timeSinceRefresh }}
+                </span>
+              </div>
               <p class="game-info">{{ gameStore.currentGame.venue }} - {{ formatTime(gameStore.currentGame.time) }}</p>
 
               <div v-if="!authStore.isAuthenticated" class="auth-notice">
@@ -149,9 +170,11 @@ import {
   IonSpinner,
   IonMenuButton,
   IonIcon,
+  IonRefresher,
+  IonRefresherContent,
   toastController
 } from '@ionic/vue'
-import { swapHorizontalOutline, personCircleOutline } from 'ionicons/icons'
+import { swapHorizontalOutline, personCircleOutline, alertCircleOutline } from 'ionicons/icons'
 import { onMounted, onUnmounted, ref, computed, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
@@ -244,7 +267,7 @@ const nextGameDate = computed(() => {
 const initializeForCity = async (newCityId) => {
   if (!newCityId) return
 
-  // Clean up previous listeners
+  // Clean up previous state
   gameStore.stopSchedulesListener()
   gameStore.stopGameListener()
 
@@ -252,8 +275,8 @@ const initializeForCity = async (newCityId) => {
   await cityStore.setCurrentCity(newCityId)
   gameStore.setCurrentCity(newCityId)
 
-  // Subscribe to schedules for this city
-  await gameStore.subscribeToSchedules(newCityId)
+  // Load schedules for this city (uses cache)
+  await gameStore.loadSchedules(newCityId)
 
   // Load today's game for this city
   await gameStore.loadTodayGame(newCityId)
@@ -274,6 +297,33 @@ onUnmounted(() => {
   gameStore.stopSchedulesListener()
   gameStore.stopGameListener()
 })
+
+// Handle pull-to-refresh
+const handleRefresh = async (event) => {
+  await gameStore.refreshGame(cityId.value)
+  event.target.complete()
+
+  const toast = await toastController.create({
+    message: 'Game data refreshed',
+    duration: 1500,
+    color: 'success'
+  })
+  await toast.present()
+}
+
+// Manual refresh (clicking on stale warning)
+const manualRefresh = async () => {
+  loading.value = true
+  await gameStore.refreshGame(cityId.value)
+  loading.value = false
+
+  const toast = await toastController.create({
+    message: 'Game data refreshed',
+    duration: 1500,
+    color: 'success'
+  })
+  await toast.present()
+}
 
 const getTodayGameTitle = () => {
   const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
@@ -354,6 +404,55 @@ const handleLogoError = (event) => {
   margin: 0 auto;
   width: 100%;
   padding: 0;
+}
+
+/* Stale Data Warning */
+.stale-warning {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  background: rgba(255, 196, 9, 0.15);
+  border: 1px solid rgba(255, 196, 9, 0.3);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.stale-warning:hover {
+  background: rgba(255, 196, 9, 0.25);
+}
+
+.stale-warning ion-icon {
+  font-size: 1.25rem;
+  color: #ffc409;
+  flex-shrink: 0;
+}
+
+.stale-warning span {
+  font-size: 0.9rem;
+  color: #ffc409;
+}
+
+.stale-warning .last-updated {
+  margin-left: auto;
+  font-size: 0.8rem;
+  color: rgba(255, 196, 9, 0.7);
+}
+
+/* Game Header */
+.game-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.last-refreshed {
+  font-size: 0.8rem;
+  color: var(--ion-color-medium);
 }
 
 h1 {

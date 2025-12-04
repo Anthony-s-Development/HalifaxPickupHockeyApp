@@ -93,9 +93,9 @@ const route = useRoute()
 const authStore = useAuthStore()
 const cityStore = useCityStore()
 
-// Subscribe to cities on app mount for real-time updates
+// Load cities on app mount (uses localStorage cache)
 onMounted(() => {
-  cityStore.subscribeToCities()
+  cityStore.loadCities()
 })
 
 // Get current city from route or store

@@ -114,8 +114,8 @@ const cityStore = useCityStore();
 const authStore = useAuthStore();
 
 onMounted(async () => {
-  // Subscribe to cities for real-time updates (new cities appear automatically)
-  await cityStore.subscribeToCities();
+  // Load cities (uses localStorage cache, refreshes if stale)
+  await cityStore.loadCities();
 
   // If user is logged in and has a default city, redirect there
   if (authStore.isAuthenticated && authStore.userProfile?.defaultCityId) {
