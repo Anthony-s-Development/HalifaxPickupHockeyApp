@@ -8,7 +8,11 @@
         <ion-title>Profile</ion-title>
         <ion-buttons slot="end">
           <ion-button @click="confirmLogout" color="medium">
-            <ion-icon :icon="logOutOutline" slot="icon-only"></ion-icon>
+            <ion-icon
+              color="danger"
+              :icon="logOutOutline"
+              slot="icon-only"
+            ></ion-icon>
           </ion-button>
         </ion-buttons>
       </ion-toolbar>
@@ -38,20 +42,20 @@
           <!-- Quick Stats -->
           <div class="quick-stats">
             <div class="stat-item">
-              <ion-icon :icon="gameControllerOutline"></ion-icon>
+              <ion-icon :icon="diceOutline"></ion-icon>
               <span class="stat-value">{{ cityGamesPlayed }}</span>
-              <span class="stat-label">Games</span>
+              <span class="stat-label">Games Played</span>
             </div>
             <div class="stat-item" :class="passStatusClass">
               <ion-icon :icon="ticketOutline"></ion-icon>
               <span class="stat-value">{{ passStatusValue }}</span>
-              <span class="stat-label">Passes</span>
+              <span class="stat-label">Skate Passes</span>
             </div>
-            <div class="stat-item">
+            <!-- <div class="stat-item">
               <ion-icon :icon="calendarOutline"></ion-icon>
               <span class="stat-value">{{ regularNightsCount }}</span>
               <span class="stat-label">Regular</span>
-            </div>
+            </div> -->
           </div>
         </div>
 
@@ -62,7 +66,10 @@
               <ion-label>Overview</ion-label>
             </ion-segment-button>
             <ion-segment-button value="pass">
-              <ion-label>Pass</ion-label>
+              <ion-label>My Passes</ion-label>
+            </ion-segment-button>
+            <ion-segment-button value="purchase">
+              <ion-label>Purchase</ion-label>
             </ion-segment-button>
             <ion-segment-button value="schedule">
               <ion-label>Schedule</ion-label>
@@ -131,62 +138,6 @@
 
           <!-- Pass Tab -->
           <div v-show="activeTab === 'pass'" class="tab-panel">
-            <!-- Buy a Pass Section -->
-            <div class="buy-pass-section">
-              <h3 class="section-title">
-                <ion-icon :icon="cardOutline"></ion-icon>
-                Buy a Pass
-              </h3>
-              <div class="pass-purchase-grid">
-                <div
-                  v-for="pass in availablePasses"
-                  :key="pass.type"
-                  class="purchase-card"
-                  :class="{ featured: pass.type === '10-game' }"
-                >
-                  <div v-if="pass.type === '10-game'" class="featured-badge">
-                    Best Value
-                  </div>
-                  <div class="purchase-card-header">
-                    <ion-icon :icon="ticketOutline"></ion-icon>
-                    <h4>{{ pass.name }}</h4>
-                  </div>
-                  <div class="purchase-card-price">
-                    <span class="price-amount">${{ pass.price }}</span>
-                    <span class="price-label">CAD</span>
-                  </div>
-                  <p class="purchase-card-games">
-                    {{ pass.games === "Unlimited" ? "Unlimited" : pass.games }}
-                    game{{
-                      pass.games !== 1 && pass.games !== "Unlimited" ? "s" : ""
-                    }}
-                  </p>
-                  <p class="purchase-card-desc">{{ pass.description }}</p>
-                  <ion-button
-                    expand="block"
-                    :disabled="
-                      paymentStore.loading && purchasingPassType === pass.type
-                    "
-                    @click="buyPass(pass.type)"
-                    class="purchase-button"
-                  >
-                    <ion-spinner
-                      v-if="
-                        paymentStore.loading && purchasingPassType === pass.type
-                      "
-                      name="crescent"
-                      slot="start"
-                    ></ion-spinner>
-                    <span v-else>Buy Now</span>
-                  </ion-button>
-                </div>
-              </div>
-              <p class="payment-note">
-                <ion-icon :icon="cardOutline"></ion-icon>
-                Secure payment via Stripe. Supports credit cards and Apple Pay.
-              </p>
-            </div>
-
             <!-- Active Passes -->
             <div v-if="activePasses.length > 0" class="passes-section">
               <h3 class="section-title">Active Passes</h3>
@@ -369,7 +320,68 @@
             <div v-if="allPasses.length === 0" class="no-passes-message">
               <ion-icon :icon="ticketOutline" class="no-pass-icon"></ion-icon>
               <h3>No Active Pass</h3>
-              <p>Purchase a pass above to start playing!</p>
+              <p>Go to the Purchase tab to buy a pass!</p>
+            </div>
+          </div>
+
+          <!-- Purchase Tab -->
+          <div v-show="activeTab === 'purchase'" class="tab-panel">
+            <div class="purchase-section">
+              <h3 class="purchase-header">
+                <ion-icon :icon="cardOutline"></ion-icon>
+                Purchase Skate Passes
+              </h3>
+              <p class="purchase-subtitle">
+                Choose a pass that works for you. All passes are valid at any
+                location.
+              </p>
+              <div class="pass-purchase-grid">
+                <div
+                  v-for="pass in availablePasses"
+                  :key="pass.type"
+                  class="purchase-card"
+                  :class="{ featured: pass.type === '10-game' }"
+                >
+                  <div v-if="pass.type === '10-game'" class="featured-badge">
+                    Best Value
+                  </div>
+                  <div class="purchase-card-header">
+                    <ion-icon :icon="ticketOutline"></ion-icon>
+                    <h4>{{ pass.name }}</h4>
+                  </div>
+                  <div class="purchase-card-price">
+                    <span class="price-amount">${{ pass.price }}</span>
+                  </div>
+                  <p class="purchase-card-games">
+                    {{ pass.games === "Unlimited" ? "Unlimited" : pass.games }}
+                    game{{
+                      pass.games !== 1 && pass.games !== "Unlimited" ? "s" : ""
+                    }}
+                  </p>
+                  <p class="purchase-card-desc">{{ pass.description }}</p>
+                  <ion-button
+                    expand="block"
+                    :disabled="
+                      paymentStore.loading && purchasingPassType === pass.type
+                    "
+                    @click="buyPass(pass.type)"
+                    class="purchase-button"
+                  >
+                    <ion-spinner
+                      v-if="
+                        paymentStore.loading && purchasingPassType === pass.type
+                      "
+                      name="crescent"
+                      slot="start"
+                    ></ion-spinner>
+                    <span v-else>Buy Now</span>
+                  </ion-button>
+                </div>
+              </div>
+              <p class="payment-note">
+                <ion-icon :icon="cardOutline"></ion-icon>
+                Secure payment via Stripe. Supports credit cards and Apple Pay.
+              </p>
             </div>
           </div>
 
@@ -504,6 +516,7 @@ import {
   chevronUpOutline,
   chevronDownOutline,
   cardOutline,
+  diceOutline,
 } from "ionicons/icons";
 import { computed, ref, onMounted } from "vue";
 import { useRouter, useRoute } from "vue-router";
@@ -1761,29 +1774,35 @@ ion-segment-button::part(indicator-background) {
 }
 
 /* ========================================
-   Buy Pass Section
+   Purchase Section
    ======================================== */
 
-.buy-pass-section {
-  margin-bottom: var(--space-lg);
+.purchase-section {
   padding-bottom: var(--space-lg);
-  border-bottom: 1px solid var(--separator-color);
 }
 
-.buy-pass-section .section-title {
+.purchase-header {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: var(--space-sm);
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin: 0 0 var(--space-md) var(--space-xs);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 var(--space-xs);
+  letter-spacing: -0.02em;
 }
 
-.buy-pass-section .section-title ion-icon {
-  font-size: 16px;
+.purchase-header ion-icon {
+  font-size: 24px;
+  color: var(--accent-color);
+}
+
+.purchase-subtitle {
+  text-align: center;
+  font-size: 15px;
+  color: var(--text-secondary);
+  margin: 0 0 var(--space-lg);
 }
 
 .pass-purchase-grid {
