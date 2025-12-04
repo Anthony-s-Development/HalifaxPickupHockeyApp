@@ -3,7 +3,11 @@
     <ion-menu content-id="main-content" type="overlay">
       <ion-header>
         <ion-toolbar>
-          <ion-title>{{ cityStore.currentCity ? cityStore.currentCityDisplayName : 'Nova Adult Hockey' }}</ion-title>
+          <ion-title>{{
+            cityStore.currentCity
+              ? cityStore.currentCityDisplayName
+              : "Nova Adult Hockey"
+          }}</ion-title>
         </ion-toolbar>
       </ion-header>
       <ion-content class="menu-content">
@@ -15,16 +19,29 @@
             </ion-item>
 
             <ion-item button @click="navigateTo(aboutPath)" lines="none">
-              <ion-icon slot="start" :icon="informationCircleOutline"></ion-icon>
+              <ion-icon
+                slot="start"
+                :icon="informationCircleOutline"
+              ></ion-icon>
               <ion-label>About</ion-label>
             </ion-item>
 
-            <ion-item v-if="isCurrentCityAdmin" button @click="navigateTo(adminPath)" lines="none">
-              <ion-icon slot="start" :icon="settings"></ion-icon>
+            <ion-item
+              v-if="isCurrentCityAdmin"
+              button
+              @click="navigateTo(adminPath)"
+              lines="none"
+            >
+              <ion-icon slot="start" :icon="settingsOutline"></ion-icon>
               <ion-label>Admin</ion-label>
             </ion-item>
 
-            <ion-item v-if="!authStore.isAuthenticated" button @click="navigateTo('/login')" lines="none">
+            <ion-item
+              v-if="!authStore.isAuthenticated"
+              button
+              @click="navigateTo('/login')"
+              lines="none"
+            >
               <ion-icon slot="start" :icon="logInOutline"></ion-icon>
               <ion-label>Login</ion-label>
             </ion-item>
@@ -42,11 +59,18 @@
                 button
                 @click="switchCity(city.id)"
                 lines="none"
-                :class="{ 'selected-city': city.id === cityStore.currentCityId }"
+                :class="{
+                  'selected-city': city.id === cityStore.currentCityId,
+                }"
               >
                 <ion-icon slot="start" :icon="locationOutline"></ion-icon>
                 <ion-label>{{ city.name }}</ion-label>
-                <ion-icon v-if="city.id === cityStore.currentCityId" slot="end" :icon="checkmarkOutline" color="success"></ion-icon>
+                <ion-icon
+                  v-if="city.id === cityStore.currentCityId"
+                  slot="end"
+                  :icon="checkmarkOutline"
+                  color="success"
+                ></ion-icon>
               </ion-item>
             </ion-list>
           </div>
@@ -58,7 +82,10 @@
             </ion-list-header>
             <ion-list>
               <ion-item lines="none">
-                <ion-icon slot="start" :icon="themeStore.isDark ? moonOutline : sunnyOutline"></ion-icon>
+                <ion-icon
+                  slot="start"
+                  :icon="themeStore.isDark ? moonOutline : sunnyOutline"
+                ></ion-icon>
                 <ion-label>Dark Mode</ion-label>
                 <ion-toggle
                   slot="end"
@@ -68,9 +95,7 @@
               </ion-item>
             </ion-list>
           </div>
-
         </div>
-
       </ion-content>
     </ion-menu>
 
@@ -93,68 +118,68 @@ import {
   IonLabel,
   IonIcon,
   IonToggle,
-  menuController
-} from '@ionic/vue'
+  menuController,
+} from "@ionic/vue";
 import {
   homeOutline,
   informationCircleOutline,
-  settings,
+  settingsOutline,
   logInOutline,
   locationOutline,
   checkmarkOutline,
   moonOutline,
-  sunnyOutline
-} from 'ionicons/icons'
-import { computed, onMounted } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
-import { useCityStore } from '@/stores/city'
-import { useThemeStore } from '@/stores/theme'
+  sunnyOutline,
+} from "ionicons/icons";
+import { computed, onMounted } from "vue";
+import { useRouter, useRoute } from "vue-router";
+import { useAuthStore } from "@/stores/auth";
+import { useCityStore } from "@/stores/city";
+import { useThemeStore } from "@/stores/theme";
 
-const router = useRouter()
-const route = useRoute()
-const authStore = useAuthStore()
-const cityStore = useCityStore()
-const themeStore = useThemeStore()
+const router = useRouter();
+const route = useRoute();
+const authStore = useAuthStore();
+const cityStore = useCityStore();
+const themeStore = useThemeStore();
 
 // Load cities on app mount (uses localStorage cache)
 onMounted(() => {
-  cityStore.loadCities()
-})
+  cityStore.loadCities();
+});
 
 // Get current city from route or store
 const currentCityId = computed(() => {
-  return route.params.cityId || cityStore.currentCityId
-})
+  return route.params.cityId || cityStore.currentCityId;
+});
 
 // Compute city-scoped paths
 const cityHomePath = computed(() => {
-  return currentCityId.value ? `/${currentCityId.value}` : '/'
-})
+  return currentCityId.value ? `/${currentCityId.value}` : "/";
+});
 
 const aboutPath = computed(() => {
-  return currentCityId.value ? `/${currentCityId.value}/about` : '/'
-})
+  return currentCityId.value ? `/${currentCityId.value}/about` : "/";
+});
 
 const adminPath = computed(() => {
-  return currentCityId.value ? `/${currentCityId.value}/admin` : '/'
-})
+  return currentCityId.value ? `/${currentCityId.value}/admin` : "/";
+});
 
 // Check if current user is admin for current city
 const isCurrentCityAdmin = computed(() => {
-  return authStore.isCityAdmin(currentCityId.value)
-})
+  return authStore.isCityAdmin(currentCityId.value);
+});
 
 const navigateTo = async (path) => {
-  await menuController.close()
-  router.push(path)
-}
+  await menuController.close();
+  router.push(path);
+};
 
 const switchCity = async (cityId) => {
-  await menuController.close()
-  await cityStore.setCurrentCity(cityId)
-  router.push(`/${cityId}`)
-}
+  await menuController.close();
+  await cityStore.setCurrentCity(cityId);
+  router.push(`/${cityId}`);
+};
 </script>
 
 <style>
@@ -286,7 +311,8 @@ body {
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display",
+    "SF Pro Text", "Helvetica Neue", sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   letter-spacing: -0.01em;
@@ -305,7 +331,7 @@ ion-header ion-toolbar {
 
 /* Add subtle bottom border/shadow to header */
 ion-header::after {
-  content: '';
+  content: "";
   position: absolute;
   bottom: 0;
   left: 0;
@@ -622,13 +648,25 @@ ion-menu .appearance-switcher ion-toggle {
    Utility Classes
    ======================================== */
 
-.text-primary { color: var(--text-primary); }
-.text-secondary { color: var(--text-secondary); }
-.text-tertiary { color: var(--text-tertiary); }
+.text-primary {
+  color: var(--text-primary);
+}
+.text-secondary {
+  color: var(--text-secondary);
+}
+.text-tertiary {
+  color: var(--text-tertiary);
+}
 
-.bg-primary { background: var(--bg-primary); }
-.bg-secondary { background: var(--bg-secondary); }
-.bg-elevated { background: var(--bg-elevated); }
+.bg-primary {
+  background: var(--bg-primary);
+}
+.bg-secondary {
+  background: var(--bg-secondary);
+}
+.bg-elevated {
+  background: var(--bg-elevated);
+}
 
 /* ========================================
    Select Popovers, Alerts, Action Sheets

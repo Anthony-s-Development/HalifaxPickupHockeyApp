@@ -138,22 +138,23 @@
 
           <!-- Pass Tab -->
           <div v-show="activeTab === 'pass'" class="tab-panel">
+            <!-- Add New Pass -->
             <div class="edit-card pass-edit-card">
               <div class="card-header">
-                <ion-icon :icon="ticketOutline"></ion-icon>
-                <h3>Skate Pass</h3>
+                <ion-icon :icon="addOutline"></ion-icon>
+                <h3>Add New Pass</h3>
                 <span class="header-badge">All Cities</span>
               </div>
 
               <div class="form-group">
-                <label class="form-label">Pass Type</label>
+                <label class="form-label">Select Pass Type</label>
                 <div class="pass-type-selector">
                   <button
-                    v-for="passType in passTypes"
+                    v-for="passType in addablePassTypes"
                     :key="passType.value"
                     class="pass-type-option"
-                    :class="{ active: user.passType === passType.value }"
-                    @click="selectPassType(passType.value)"
+                    :class="{ active: selectedNewPassType === passType.value }"
+                    @click="selectedNewPassType = passType.value"
                   >
                     <ion-icon :icon="passType.icon"></ion-icon>
                     <span class="pass-type-name">{{ passType.name }}</span>
@@ -162,38 +163,87 @@
                 </div>
               </div>
 
-              <div v-if="user.passType && user.passType !== 'full-season'" class="form-group">
-                <label class="form-label">Games Remaining</label>
-                <div class="games-remaining-control">
-                  <button class="control-btn" @click="adjustGamesRemaining(-1)">
-                    <ion-icon :icon="removeOutline"></ion-icon>
-                  </button>
-                  <ion-input
-                    v-model.number="user.passGamesRemaining"
-                    type="number"
-                    min="0"
-                    class="games-input"
-                  ></ion-input>
-                  <button class="control-btn" @click="adjustGamesRemaining(1)">
-                    <ion-icon :icon="addOutline"></ion-icon>
-                  </button>
-                </div>
-                <div class="pass-meter">
-                  <div class="meter-bar">
-                    <div class="meter-fill" :style="{ width: passPercentage + '%' }"></div>
+              <ion-button
+                expand="block"
+                :disabled="!selectedNewPassType || addingPass"
+                @click="handleAddPass"
+                class="add-pass-button"
+              >
+                <ion-spinner v-if="addingPass" name="crescent" slot="start"></ion-spinner>
+                <ion-icon v-else :icon="addOutline" slot="start"></ion-icon>
+                {{ addingPass ? 'Adding...' : 'Add Pass' }}
+              </ion-button>
+            </div>
+
+            <!-- Existing Passes -->
+            <div class="edit-card" v-if="userPasses.length > 0">
+              <div class="card-header">
+                <ion-icon :icon="ticketOutline"></ion-icon>
+                <h3>Existing Passes ({{ userPasses.length }})</h3>
+              </div>
+
+              <div class="existing-passes-list">
+                <div
+                  v-for="pass in userPasses"
+                  :key="pass.id"
+                  class="existing-pass-item"
+                  :class="{ exhausted: pass.status === 'exhausted' }"
+                >
+                  <div class="pass-item-header">
+                    <div class="pass-item-info">
+                      <ion-icon :icon="ticketOutline" class="pass-item-icon"></ion-icon>
+                      <div class="pass-item-details">
+                        <span class="pass-item-type">{{ getPassTypeName(pass.type) }}</span>
+                        <span class="pass-item-date">Added {{ formatDate(pass.purchaseDate) }}</span>
+                      </div>
+                    </div>
+                    <ion-badge :color="pass.status === 'active' ? 'success' : 'medium'">
+                      {{ pass.status === 'active' ? 'Active' : 'Exhausted' }}
+                    </ion-badge>
+                  </div>
+
+                  <div v-if="pass.type !== 'full-season'" class="pass-item-games">
+                    <div class="games-remaining-control compact">
+                      <button class="control-btn small" @click="adjustPassGames(pass.id, -1)">
+                        <ion-icon :icon="removeOutline"></ion-icon>
+                      </button>
+                      <span class="games-display">{{ pass.gamesRemaining }} / {{ pass.gamesTotal }}</span>
+                      <button class="control-btn small" @click="adjustPassGames(pass.id, 1)">
+                        <ion-icon :icon="addOutline"></ion-icon>
+                      </button>
+                    </div>
+                    <div class="pass-meter compact">
+                      <div class="meter-bar">
+                        <div
+                          class="meter-fill"
+                          :style="{ width: (pass.gamesRemaining / pass.gamesTotal * 100) + '%' }"
+                        ></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div v-else class="unlimited-status compact">
+                    <ion-icon :icon="infiniteOutline"></ion-icon>
+                    <span>Unlimited</span>
+                  </div>
+
+                  <div class="pass-item-footer">
+                    <span v-if="pass.usageHistory?.length" class="usage-count">
+                      {{ pass.usageHistory.length }} game{{ pass.usageHistory.length !== 1 ? 's' : '' }} used
+                    </span>
+                    <button class="remove-pass-btn" @click="handleRemovePass(pass.id)">
+                      <ion-icon :icon="trashOutline"></ion-icon>
+                      Remove
+                    </button>
                   </div>
                 </div>
               </div>
+            </div>
 
-              <div v-if="user.passType === 'full-season'" class="unlimited-status">
-                <ion-icon :icon="infiniteOutline"></ion-icon>
-                <span>Unlimited Games - Full Season Pass</span>
-              </div>
-
-              <div v-if="user.passStartDate" class="pass-date-info">
-                <ion-icon :icon="calendarOutline"></ion-icon>
-                <span>Pass started {{ formatDate(user.passStartDate) }}</span>
-              </div>
+            <!-- No Passes -->
+            <div v-else class="edit-card empty-passes">
+              <ion-icon :icon="ticketOutline" class="empty-icon"></ion-icon>
+              <p>No passes assigned to this user</p>
             </div>
           </div>
 
@@ -332,6 +382,7 @@ import {
   IonToggle,
   IonIcon,
   IonSpinner,
+  IonBadge,
   toastController,
 } from "@ionic/vue";
 import {
@@ -348,9 +399,9 @@ import {
   starOutline,
   addOutline,
   removeOutline,
-  closeOutline,
   fitnessOutline,
   handLeftOutline,
+  trashOutline,
 } from "ionicons/icons";
 import { ref, computed, onMounted, reactive } from "vue";
 import { useRoute, useRouter } from "vue-router";
@@ -369,6 +420,8 @@ const gameStore = useGameStore();
 const user = ref(null);
 const saving = ref(false);
 const activeTab = ref("profile");
+const selectedNewPassType = ref(null);
+const addingPass = ref(false);
 
 // City-specific data
 const cityData = reactive({
@@ -384,9 +437,9 @@ const skillLevels = [
   { value: 3, name: "Advanced", description: "Advanced skills, strong physical shape, and a high understanding of the game" },
 ];
 
-// Pass types
-const passTypes = [
-  { value: null, name: "No Pass", icon: closeOutline, games: null },
+// Pass types for adding new passes
+const addablePassTypes = [
+  { value: "1-game", name: "1 Game", icon: ticketOutline, games: "1 game" },
   { value: "5-game", name: "5 Game", icon: ticketOutline, games: "5 games" },
   { value: "10-game", name: "10 Game", icon: ticketOutline, games: "10 games" },
   { value: "full-season", name: "Full Season", icon: infiniteOutline, games: "Unlimited" },
@@ -431,10 +484,12 @@ const citySchedules = computed(() => {
     .sort((a, b) => a.day - b.day);
 });
 
-const passPercentage = computed(() => {
-  if (!user.value?.passType || user.value.passType === "full-season") return 100;
-  const total = user.value.passType === "5-game" ? 5 : 10;
-  return Math.min((user.value.passGamesRemaining / total) * 100, 100);
+// Multi-pass computed property
+const userPasses = computed(() => {
+  if (!user.value?.passes || !Array.isArray(user.value.passes)) return [];
+  return [...user.value.passes].sort((a, b) =>
+    new Date(a.purchaseDate) - new Date(b.purchaseDate)
+  );
 });
 
 // Methods
@@ -443,26 +498,82 @@ const getSkillDescription = (level) => {
   return skill?.description || "Not set";
 };
 
-const selectPassType = (passType) => {
-  user.value.passType = passType;
-  if (passType === "5-game") {
-    user.value.passGamesRemaining = 5;
-    user.value.passStartDate = new Date().toISOString();
-  } else if (passType === "10-game") {
-    user.value.passGamesRemaining = 10;
-    user.value.passStartDate = new Date().toISOString();
-  } else if (passType === "full-season") {
-    user.value.passGamesRemaining = 0;
-    user.value.passStartDate = new Date().toISOString();
-  } else {
-    user.value.passGamesRemaining = 0;
-    user.value.passStartDate = null;
+// Multi-pass methods
+const getPassTypeName = (passType) => {
+  const types = {
+    "1-game": "1 Game Pass",
+    "5-game": "5 Game Pass",
+    "10-game": "10 Game Pass",
+    "full-season": "Full Season Pass",
+  };
+  return types[passType] || "Unknown";
+};
+
+const handleAddPass = async () => {
+  if (!selectedNewPassType.value || !user.value) return;
+
+  addingPass.value = true;
+  const result = await adminStore.addUserPass(user.value.id, selectedNewPassType.value);
+
+  const toast = await toastController.create({
+    message: result.success ? "Pass added successfully!" : result.error,
+    duration: 2000,
+    color: result.success ? "success" : "danger",
+  });
+  await toast.present();
+
+  if (result.success) {
+    // Refresh user data
+    const updatedUser = adminStore.allUsers.find(u => u.id === user.value.id);
+    if (updatedUser) {
+      user.value.passes = updatedUser.passes || [];
+    }
+    selectedNewPassType.value = null;
+  }
+
+  addingPass.value = false;
+};
+
+const handleRemovePass = async (passId) => {
+  if (!user.value) return;
+
+  const result = await adminStore.removeUserPass(user.value.id, passId);
+
+  const toast = await toastController.create({
+    message: result.success ? "Pass removed successfully!" : result.error,
+    duration: 2000,
+    color: result.success ? "success" : "danger",
+  });
+  await toast.present();
+
+  if (result.success) {
+    // Refresh user data
+    const updatedUser = adminStore.allUsers.find(u => u.id === user.value.id);
+    if (updatedUser) {
+      user.value.passes = updatedUser.passes || [];
+    }
   }
 };
 
-const adjustGamesRemaining = (amount) => {
-  const newValue = (user.value.passGamesRemaining || 0) + amount;
-  user.value.passGamesRemaining = Math.max(0, newValue);
+const adjustPassGames = async (passId, amount) => {
+  if (!user.value) return;
+
+  const pass = user.value.passes?.find(p => p.id === passId);
+  if (!pass || pass.type === 'full-season') return;
+
+  const newGamesRemaining = Math.max(0, Math.min(pass.gamesTotal, pass.gamesRemaining + amount));
+
+  const result = await adminStore.updateUserPass(user.value.id, passId, {
+    gamesRemaining: newGamesRemaining
+  });
+
+  if (result.success) {
+    // Refresh user data
+    const updatedUser = adminStore.allUsers.find(u => u.id === user.value.id);
+    if (updatedUser) {
+      user.value.passes = updatedUser.passes || [];
+    }
+  }
 };
 
 const toggleRegular = (scheduleId) => {
@@ -507,9 +618,6 @@ const saveUserChanges = async () => {
     email: user.value.email,
     position: user.value.position,
     skillLevel: user.value.skillLevel,
-    passType: user.value.passType,
-    passGamesRemaining: user.value.passGamesRemaining,
-    passStartDate: user.value.passStartDate,
     [`cityData.${cityId.value}`]: cityDataUpdate,
   };
 
@@ -550,9 +658,7 @@ onMounted(async () => {
     user.value = {
       ...foundUser,
       isSuperAdmin: foundUser.isSuperAdmin || false,
-      passType: foundUser.passType || null,
-      passGamesRemaining: foundUser.passGamesRemaining || 0,
-      passStartDate: foundUser.passStartDate || null,
+      passes: foundUser.passes || [],
     };
 
     const userCityData = foundUser.cityData?.[cityId.value] || {};
@@ -926,8 +1032,9 @@ ion-segment-button::part(indicator-background) {
 
 .pass-type-selector {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: var(--space-sm);
+  width: 100%;
 }
 
 .pass-type-option {
@@ -1071,6 +1178,169 @@ ion-segment-button::part(indicator-background) {
   border-radius: var(--radius-sm);
   font-size: 14px;
   color: var(--text-secondary);
+}
+
+/* ========================================
+   Multi-Pass Admin Styles
+   ======================================== */
+
+.add-pass-button {
+  margin-top: var(--space-md);
+  --background: var(--accent-color);
+  --background-hover: var(--accent-color-hover);
+  --border-radius: var(--radius-md);
+  font-weight: 600;
+}
+
+.pass-edit-card {
+  margin-bottom: var(--space-lg);
+}
+
+.existing-passes-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.existing-pass-item {
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  border-left: 4px solid var(--color-success);
+}
+
+.existing-pass-item.exhausted {
+  border-left-color: var(--text-tertiary);
+  opacity: 0.8;
+}
+
+.pass-item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-sm);
+}
+
+.pass-item-info {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.pass-item-icon {
+  font-size: 24px;
+  color: var(--accent-color);
+}
+
+.existing-pass-item.exhausted .pass-item-icon {
+  color: var(--text-tertiary);
+}
+
+.pass-item-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pass-item-type {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.pass-item-date {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.pass-item-games {
+  margin: var(--space-sm) 0;
+}
+
+.games-remaining-control.compact {
+  padding: var(--space-xs);
+  background: var(--card-bg);
+}
+
+.control-btn.small {
+  width: 32px;
+  height: 32px;
+}
+
+.control-btn.small ion-icon {
+  font-size: 16px;
+}
+
+.games-display {
+  flex: 1;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.pass-meter.compact {
+  margin-top: var(--space-xs);
+}
+
+.unlimited-status.compact {
+  padding: var(--space-sm);
+  margin: var(--space-sm) 0;
+  font-size: 14px;
+}
+
+.pass-item-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: var(--space-sm);
+  padding-top: var(--space-sm);
+  border-top: 1px solid var(--separator-color);
+}
+
+.usage-count {
+  font-size: 13px;
+  color: var(--text-tertiary);
+}
+
+.remove-pass-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: none;
+  color: var(--color-danger);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-sm);
+  transition: background var(--transition-fast);
+}
+
+.remove-pass-btn:hover {
+  background: rgba(255, 59, 48, 0.1);
+}
+
+.remove-pass-btn ion-icon {
+  font-size: 16px;
+}
+
+.empty-passes {
+  text-align: center;
+  padding: var(--space-xl);
+  color: var(--text-tertiary);
+}
+
+.empty-passes .empty-icon {
+  font-size: 48px;
+  margin-bottom: var(--space-md);
+  color: var(--text-quaternary);
+}
+
+.empty-passes p {
+  margin: 0;
+  font-size: 15px;
 }
 
 /* ========================================

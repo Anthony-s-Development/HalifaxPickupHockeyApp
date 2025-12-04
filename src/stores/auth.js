@@ -121,12 +121,80 @@ export const useAuthStore = defineStore('auth', () => {
     return 0
   }
 
-  // Get pass info (global - usable across all cities)
+  // Get all passes (active and exhausted)
+  const getAllPasses = () => {
+    if (!userProfile.value) return []
+
+    // Check for new passes array
+    if (userProfile.value.passes && Array.isArray(userProfile.value.passes)) {
+      return [...userProfile.value.passes].sort((a, b) =>
+        new Date(a.purchaseDate) - new Date(b.purchaseDate)
+      )
+    }
+
+    // Migrate legacy single pass to array format (read-only)
+    if (userProfile.value.passType) {
+      const gamesTotal = userProfile.value.passType === '1-game' ? 1 :
+                         userProfile.value.passType === '5-game' ? 5 :
+                         userProfile.value.passType === '10-game' ? 10 : 999
+      return [{
+        id: 'legacy_pass',
+        type: userProfile.value.passType,
+        gamesTotal: gamesTotal,
+        gamesRemaining: userProfile.value.passGamesRemaining || 0,
+        purchaseDate: userProfile.value.passStartDate || new Date().toISOString(),
+        status: userProfile.value.passGamesRemaining > 0 || userProfile.value.passType === 'full-season'
+          ? 'active' : 'exhausted',
+        usageHistory: []
+      }]
+    }
+
+    return []
+  }
+
+  // Get only active passes (sorted by purchase date - oldest first)
+  const getActivePasses = () => {
+    return getAllPasses().filter(pass =>
+      pass.status === 'active' &&
+      (pass.type === 'full-season' || pass.gamesRemaining > 0)
+    )
+  }
+
+  // Get the current pass to use (oldest active pass - FIFO)
+  const getCurrentPass = () => {
+    const activePasses = getActivePasses()
+    return activePasses.length > 0 ? activePasses[0] : null
+  }
+
+  // Get total games remaining across all active passes
+  const getTotalGamesRemaining = () => {
+    const activePasses = getActivePasses()
+
+    // If any pass is full-season, return Infinity
+    if (activePasses.some(p => p.type === 'full-season')) {
+      return Infinity
+    }
+
+    return activePasses.reduce((sum, pass) => sum + (pass.gamesRemaining || 0), 0)
+  }
+
+  // Get pass info (global - usable across all cities) - backward compatible
   const getPassInfo = () => {
     if (!userProfile.value) {
       return { passType: null, passGamesRemaining: 0, passStartDate: null }
     }
 
+    // Use the current (oldest active) pass for backward compatibility
+    const currentPass = getCurrentPass()
+    if (currentPass) {
+      return {
+        passType: currentPass.type,
+        passGamesRemaining: currentPass.type === 'full-season' ? 999 : currentPass.gamesRemaining,
+        passStartDate: currentPass.purchaseDate
+      }
+    }
+
+    // Fall back to legacy fields if no passes array
     return {
       passType: userProfile.value.passType || null,
       passGamesRemaining: userProfile.value.passGamesRemaining || 0,
@@ -237,7 +305,7 @@ export const useAuthStore = defineStore('auth', () => {
       // Get the city from userData or default to halifax
       const cityId = userData.cityId || 'halifax'
 
-      // Create profile data with city-scoped fields and global pass
+      // Create profile data with city-scoped fields and multi-pass support
       const profileData = {
         email: email,
         name: userData.name,
@@ -245,7 +313,9 @@ export const useAuthStore = defineStore('auth', () => {
         skillLevel: userData.skillLevel || 2,
         defaultCityId: cityId,
         isSuperAdmin: false,
-        // Global pass info (usable across all cities)
+        // Multi-pass system (global - usable across all cities)
+        passes: [],
+        // Legacy pass fields for backward compatibility
         passType: null,
         passGamesRemaining: 0,
         passStartDate: null,
@@ -332,6 +402,11 @@ export const useAuthStore = defineStore('auth', () => {
     isRegularForSchedule,
     getCityRegulars,
     getCityGamesPlayed,
+    // Multi-pass functions
+    getAllPasses,
+    getActivePasses,
+    getCurrentPass,
+    getTotalGamesRemaining,
     getPassInfo,
     getCityPassInfo, // Alias for backward compatibility
     initAuth,

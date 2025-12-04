@@ -45,7 +45,7 @@
             <div class="stat-item" :class="passStatusClass">
               <ion-icon :icon="ticketOutline"></ion-icon>
               <span class="stat-value">{{ passStatusValue }}</span>
-              <span class="stat-label">Pass</span>
+              <span class="stat-label">Passes</span>
             </div>
             <div class="stat-item">
               <ion-icon :icon="calendarOutline"></ion-icon>
@@ -131,53 +131,187 @@
 
           <!-- Pass Tab -->
           <div v-show="activeTab === 'pass'" class="tab-panel">
-            <div class="pass-card" :class="{ 'no-pass': !passInfo.passType }">
-              <div v-if="passInfo.passType" class="pass-content">
-                <div class="pass-header">
-                  <ion-icon :icon="ticketOutline" class="pass-icon"></ion-icon>
-                  <div class="pass-title">
-                    <h3>{{ passTypeName }}</h3>
-                    <span class="pass-valid">Valid for all cities</span>
-                  </div>
-                </div>
-
-                <div class="pass-details">
-                  <div
-                    v-if="passInfo.passType !== 'full-season'"
-                    class="pass-meter"
-                  >
-                    <div class="meter-label">
-                      <span>Games Remaining</span>
-                      <span
-                        class="meter-value"
-                        :class="{ danger: passInfo.passGamesRemaining === 0 }"
-                      >
-                        {{ passInfo.passGamesRemaining }}
-                      </span>
+            <!-- Active Passes -->
+            <div v-if="activePasses.length > 0" class="passes-section">
+              <h3 class="section-title">Active Passes</h3>
+              <div class="passes-list">
+                <div
+                  v-for="pass in activePasses"
+                  :key="pass.id"
+                  class="pass-card"
+                >
+                  <div class="pass-content">
+                    <div class="pass-header">
+                      <ion-icon
+                        :icon="ticketOutline"
+                        class="pass-icon"
+                      ></ion-icon>
+                      <div class="pass-title">
+                        <h3>{{ getPassTypeName(pass.type) }}</h3>
+                        <span class="pass-valid">Valid for all cities</span>
+                      </div>
                     </div>
-                    <div class="meter-bar">
+
+                    <div class="pass-details">
                       <div
-                        class="meter-fill"
-                        :style="{ width: passPercentage + '%' }"
-                      ></div>
-                    </div>
-                  </div>
-                  <div v-else class="unlimited-badge">
-                    <ion-icon :icon="infiniteOutline"></ion-icon>
-                    <span>Unlimited Games</span>
-                  </div>
+                        v-if="pass.type !== 'full-season'"
+                        class="pass-meter"
+                      >
+                        <div class="meter-label">
+                          <span>Games Remaining</span>
+                          <span
+                            class="meter-value"
+                            :class="{ danger: pass.gamesRemaining === 0 }"
+                          >
+                            {{ pass.gamesRemaining }} / {{ pass.gamesTotal }}
+                          </span>
+                        </div>
+                        <div class="meter-bar">
+                          <div
+                            class="meter-fill"
+                            :style="{
+                              width:
+                                (pass.gamesRemaining / pass.gamesTotal) * 100 +
+                                '%',
+                            }"
+                          ></div>
+                        </div>
+                      </div>
+                      <div v-else class="unlimited-badge">
+                        <ion-icon :icon="infiniteOutline"></ion-icon>
+                        <span>Unlimited Games</span>
+                      </div>
 
-                  <div v-if="passInfo.passStartDate" class="pass-date">
-                    <ion-icon :icon="calendarOutline"></ion-icon>
-                    <span
-                      >Started
-                      {{ formatPassDate(passInfo.passStartDate) }}</span
-                    >
+                      <div class="pass-date">
+                        <ion-icon :icon="calendarOutline"></ion-icon>
+                        <span
+                          >Purchased
+                          {{ formatPassDate(pass.purchaseDate) }}</span
+                        >
+                      </div>
+
+                      <button
+                        v-if="pass.usageHistory && pass.usageHistory.length > 0"
+                        class="usage-button"
+                        @click="toggleUsageHistory(pass.id)"
+                      >
+                        <ion-icon
+                          :icon="
+                            expandedPass === pass.id
+                              ? chevronUpOutline
+                              : chevronDownOutline
+                          "
+                        ></ion-icon>
+                        View Usage History ({{ pass.usageHistory.length }})
+                      </button>
+
+                      <div
+                        v-if="expandedPass === pass.id && pass.usageHistory"
+                        class="usage-history"
+                      >
+                        <div
+                          v-for="(usage, idx) in pass.usageHistory"
+                          :key="idx"
+                          class="usage-item"
+                        >
+                          <div class="usage-number">{{ idx + 1 }}</div>
+                          <div class="usage-details">
+                            <span class="usage-venue">{{ usage.venue }}</span>
+                            <span class="usage-date">{{
+                              formatPassDate(usage.date)
+                            }}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
+            </div>
 
-              <div v-else class="no-pass-content">
+            <!-- Pass History (Exhausted) -->
+            <div
+              v-if="exhaustedPasses.length > 0"
+              class="passes-section history-section"
+            >
+              <button
+                class="section-toggle"
+                @click="showPassHistory = !showPassHistory"
+              >
+                <h3 class="section-title">
+                  Pass History ({{ exhaustedPasses.length }})
+                </h3>
+                <ion-icon
+                  :icon="
+                    showPassHistory ? chevronUpOutline : chevronDownOutline
+                  "
+                ></ion-icon>
+              </button>
+
+              <div v-if="showPassHistory" class="passes-list exhausted">
+                <div
+                  v-for="pass in exhaustedPasses"
+                  :key="pass.id"
+                  class="pass-card exhausted"
+                >
+                  <div class="pass-content">
+                    <div class="pass-header">
+                      <ion-icon
+                        :icon="ticketOutline"
+                        class="pass-icon exhausted"
+                      ></ion-icon>
+                      <div class="pass-title">
+                        <h3>{{ getPassTypeName(pass.type) }}</h3>
+                        <span class="pass-exhausted-badge">Exhausted</span>
+                      </div>
+                    </div>
+
+                    <div class="pass-date">
+                      <ion-icon :icon="calendarOutline"></ion-icon>
+                      <span>{{ formatPassDate(pass.purchaseDate) }}</span>
+                    </div>
+
+                    <button
+                      v-if="pass.usageHistory && pass.usageHistory.length > 0"
+                      class="usage-button"
+                      @click="toggleUsageHistory(pass.id)"
+                    >
+                      <ion-icon
+                        :icon="
+                          expandedPass === pass.id
+                            ? chevronUpOutline
+                            : chevronDownOutline
+                        "
+                      ></ion-icon>
+                      View Usage History ({{ pass.usageHistory.length }})
+                    </button>
+
+                    <div
+                      v-if="expandedPass === pass.id && pass.usageHistory"
+                      class="usage-history"
+                    >
+                      <div
+                        v-for="(usage, idx) in pass.usageHistory"
+                        :key="idx"
+                        class="usage-item"
+                      >
+                        <div class="usage-number">{{ idx + 1 }}</div>
+                        <div class="usage-details">
+                          <span class="usage-venue">{{ usage.venue }}</span>
+                          <span class="usage-date">{{
+                            formatPassDate(usage.date)
+                          }}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- No Passes -->
+            <div v-if="allPasses.length === 0" class="pass-card no-pass">
+              <div class="no-pass-content">
                 <ion-icon :icon="ticketOutline" class="no-pass-icon"></ion-icon>
                 <h3>No Active Pass</h3>
                 <p>Contact an admin to purchase a skate pass.</p>
@@ -325,6 +459,8 @@ import {
   shieldOutline,
   fitnessOutline,
   handLeftOutline,
+  chevronUpOutline,
+  chevronDownOutline,
 } from "ionicons/icons";
 import { computed, ref, onMounted } from "vue";
 import { useRouter, useRoute } from "vue-router";
@@ -339,6 +475,8 @@ const cityStore = useCityStore();
 const gameStore = useGameStore();
 
 const activeTab = ref("overview");
+const expandedPass = ref(null);
+const showPassHistory = ref(false);
 
 // Skill levels configuration
 const skillLevels = [
@@ -397,17 +535,27 @@ const cityGamesPlayed = computed(() =>
 
 const passInfo = computed(() => authStore.getPassInfo());
 
+// Multi-pass computed properties
+const allPasses = computed(() => authStore.getAllPasses());
+const activePasses = computed(() => authStore.getActivePasses());
+const exhaustedPasses = computed(() =>
+  allPasses.value.filter((p) => p.status === "exhausted")
+);
+
 const passStatusClass = computed(() => {
-  if (!passInfo.value.passType) return "no-pass";
-  if (passInfo.value.passType === "full-season") return "unlimited";
-  if (passInfo.value.passGamesRemaining === 0) return "expired";
+  const active = activePasses.value;
+  if (active.length === 0) return "no-pass";
+  if (active.some((p) => p.type === "full-season")) return "unlimited";
+  const totalRemaining = authStore.getTotalGamesRemaining();
+  if (totalRemaining === 0) return "expired";
   return "active";
 });
 
 const passStatusValue = computed(() => {
-  if (!passInfo.value.passType) return "None";
-  if (passInfo.value.passType === "full-season") return "Full";
-  return passInfo.value.passGamesRemaining;
+  const active = activePasses.value;
+  if (active.length === 0) return "None";
+  if (active.some((p) => p.type === "full-season")) return "∞";
+  return authStore.getTotalGamesRemaining();
 });
 
 const passTypeName = computed(() => {
@@ -483,6 +631,21 @@ const sortedGameHistory = computed(() => {
 // Methods
 const isRegularForSchedule = (scheduleId) => {
   return authStore.isRegularForSchedule(scheduleId, cityId.value);
+};
+
+// Multi-pass methods
+const getPassTypeName = (passType) => {
+  const types = {
+    "1-game": "1 Game Pass",
+    "5-game": "5 Game Pass",
+    "10-game": "10 Game Pass",
+    "full-season": "Full Season Pass",
+  };
+  return types[passType] || "Unknown";
+};
+
+const toggleUsageHistory = (passId) => {
+  expandedPass.value = expandedPass.value === passId ? null : passId;
 };
 
 const updateSkillLevel = async (newLevel) => {
@@ -1097,6 +1260,149 @@ ion-segment-button::part(indicator-background) {
   color: var(--accent-color);
   margin-top: 4px;
   font-weight: 500;
+}
+
+/* ========================================
+   Multi-Pass Styles
+   ======================================== */
+
+.passes-section {
+  margin-bottom: var(--space-lg);
+}
+
+.section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 0 0 var(--space-sm) var(--space-xs);
+}
+
+.passes-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.passes-list.exhausted {
+  margin-top: var(--space-md);
+}
+
+.pass-card.exhausted {
+  opacity: 0.7;
+}
+
+.pass-card.exhausted .pass-icon {
+  color: var(--text-tertiary);
+}
+
+.pass-exhausted-badge {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  font-weight: 500;
+}
+
+.section-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background: transparent;
+  border: none;
+  padding: var(--space-sm) var(--space-xs);
+  cursor: pointer;
+  color: var(--text-secondary);
+}
+
+.section-toggle ion-icon {
+  font-size: 18px;
+  color: var(--text-tertiary);
+}
+
+.section-toggle .section-title {
+  margin: 0;
+}
+
+.history-section {
+  margin-top: var(--space-lg);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--separator-color);
+}
+
+.usage-button {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+  background: var(--bg-secondary);
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: var(--space-sm) var(--space-md);
+  margin-top: var(--space-md);
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--accent-color);
+  font-weight: 500;
+  transition: background var(--transition-fast);
+}
+
+.usage-button:hover {
+  background: var(--bg-tertiary);
+}
+
+.usage-button ion-icon {
+  font-size: 16px;
+}
+
+.usage-history {
+  margin-top: var(--space-md);
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.usage-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: 1px solid var(--separator-color);
+}
+
+.usage-item:last-child {
+  border-bottom: none;
+}
+
+.usage-number {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-full);
+  background: var(--accent-color-light);
+  color: var(--accent-color);
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.usage-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.usage-venue {
+  font-size: 14px;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.usage-date {
+  font-size: 12px;
+  color: var(--text-tertiary);
 }
 
 /* ========================================
