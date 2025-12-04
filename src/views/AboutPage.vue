@@ -4,7 +4,7 @@
       <ion-toolbar>
         <div slot="start" class="header-start">
           <img
-            src="/Halifax-Pickup-Hockey.png"
+            src="/logos/halifax.png"
             alt="Halifax Pickup Hockey Logo"
             class="header-logo"
           />
@@ -16,7 +16,7 @@
 
     <ion-content class="ion-padding">
       <div class="about-container">
-        <h1>About Halifax Pickup Hockey</h1>
+        <h1>About Nova Pickup Hockey</h1>
 
         <ion-card>
           <ion-card-content>

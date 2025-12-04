@@ -14,30 +14,34 @@
         <h1>Welcome Back</h1>
 
         <form @submit.prevent="handleLogin">
-          <ion-item>
-            <ion-label position="floating">Email</ion-label>
-            <ion-input
-              v-model="email"
-              type="email"
-              required
-              autocomplete="email"
-            ></ion-input>
-          </ion-item>
+          <ion-input
+            v-model="email"
+            type="email"
+            label="Email"
+            label-placement="stacked"
+            placeholder="Enter your email"
+            required
+            autocomplete="email"
+            fill="outline"
+            class="form-input"
+          ></ion-input>
 
-          <ion-item>
-            <ion-label position="floating">Password</ion-label>
-            <ion-input
-              v-model="password"
-              type="password"
-              required
-              autocomplete="current-password"
-            ></ion-input>
-          </ion-item>
+          <ion-input
+            v-model="password"
+            type="password"
+            label="Password"
+            label-placement="stacked"
+            placeholder="Enter your password"
+            required
+            autocomplete="current-password"
+            fill="outline"
+            class="form-input"
+          ></ion-input>
 
           <ion-button
             type="submit"
             expand="block"
-            class="ion-margin-top"
+            class="submit-button"
             :disabled="loading"
           >
             <ion-spinner v-if="loading" />
@@ -68,8 +72,6 @@ import {
   IonButton,
   IonButtons,
   IonBackButton,
-  IonItem,
-  IonLabel,
   IonInput,
   IonText,
   IonSpinner,
@@ -100,7 +102,10 @@ const handleLogin = async () => {
     });
     await toast.present();
 
-    const redirectPath = route.query.redirect || "/";
+    // Redirect to specified path, user's default city, or city selection
+    const defaultCity = authStore.userProfile?.defaultCityId;
+    const redirectPath =
+      route.query.redirect || (defaultCity ? `/${defaultCity}` : "/");
     router.push(redirectPath);
   } else {
     const toast = await toastController.create({
@@ -117,20 +122,36 @@ const handleLogin = async () => {
 .login-container {
   max-width: 500px;
   margin: 0 auto;
+  padding-top: 2rem;
 }
 
 h1 {
   text-align: center;
   margin-bottom: 2rem;
+  font-size: 24px;
+  font-weight: 600;
 }
 
 form {
-  margin-bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.form-input {
+  --border-radius: 8px;
+  --highlight-color-focused: var(--ion-color-primary);
+}
+
+.submit-button {
+  margin-top: 8px;
+  --border-radius: 8px;
+  font-weight: 600;
 }
 
 .register-link {
   text-align: center;
-  margin-top: 1rem;
+  margin-top: 1.5rem;
 }
 
 .register-link a {

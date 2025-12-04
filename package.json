@@ -13,6 +13,8 @@
   },
   "dependencies": {
     "@capacitor-firebase/authentication": "^7.4.0",
+    "@capacitor/app": "^7.1.0",
+    "@capacitor/browser": "^7.0.2",
     "@ionic/vue": "^8.0.0",
     "@ionic/vue-router": "^8.0.0",
     "firebase": "^12.3.0",

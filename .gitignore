@@ -31,8 +31,10 @@ dist-ssr
 # Capacitor
 android/
 ios/
+scripts/
 
 resources/ios/**/*
 resources/android/**/*
 
 serviceAccountKey.json
+PLAN.md

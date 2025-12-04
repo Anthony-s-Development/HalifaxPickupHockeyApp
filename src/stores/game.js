@@ -6,10 +6,8 @@ import {
   getDoc,
   setDoc,
   updateDoc,
-  onSnapshot,
   arrayUnion,
   arrayRemove,
-  increment,
   query,
   where,
   getDocs,
@@ -17,108 +15,184 @@ import {
 } from 'firebase/firestore'
 import { db } from '@/config/firebase'
 import { useAuthStore } from './auth'
+import { useCityStore } from './city'
+
+// Cache configuration
+const STALE_THRESHOLD_MS = 60 * 60 * 1000 // 1 hour
+const SCHEDULES_CACHE_KEY = 'game_schedules_cache'
+const SCHEDULES_CACHE_TIMESTAMP_KEY = 'game_schedules_cache_timestamp'
+const SCHEDULES_CACHE_DURATION_MS = 24 * 60 * 60 * 1000 // 24 hours
 
 export const useGameStore = defineStore('game', () => {
   const games = ref([])
   const currentGame = ref(null)
   const loading = ref(false)
   const schedulesLoaded = ref(false)
-  let unsubscribeGame = null
-  let unsubscribeSchedules = null
+  const currentCityId = ref(null)
+  const lastRefreshed = ref(null)
 
-  // Default schedules (fallback if Firestore hasn't loaded)
-  const DEFAULT_SCHEDULES = {
-    monday_11pm_forum: { day: 1, time: '23:00', venue: 'Forum' },
-    tuesday_1030pm_forum: { day: 2, time: '22:30', venue: 'Forum' },
-    thursday_1030pm_civic: { day: 4, time: '22:30', venue: 'Civic' },
-    friday_1030pm_forum: { day: 5, time: '22:30', venue: 'Forum' },
-    saturday_1030pm_forum: { day: 6, time: '22:30', venue: 'Forum' }
-  }
-
-  // Dynamic schedules loaded from Firestore
-  const gameSchedules = ref({ ...DEFAULT_SCHEDULES })
+  // Dynamic schedules loaded from Firestore (city-filtered)
+  const gameSchedules = ref({})
 
   // Legacy export for backward compatibility
   const GAME_SCHEDULES = gameSchedules
 
-  const subscribeToSchedules = () => {
-    // Unsubscribe from existing listener if any
-    if (unsubscribeSchedules) {
-      unsubscribeSchedules()
+  // Check if game data is stale (older than 1 hour)
+  const isDataStale = computed(() => {
+    if (!lastRefreshed.value) return false
+    const age = Date.now() - lastRefreshed.value
+    return age > STALE_THRESHOLD_MS
+  })
+
+  // Get time since last refresh in a human-readable format
+  const timeSinceRefresh = computed(() => {
+    if (!lastRefreshed.value) return null
+    const seconds = Math.floor((Date.now() - lastRefreshed.value) / 1000)
+    if (seconds < 60) return 'just now'
+    const minutes = Math.floor(seconds / 60)
+    if (minutes < 60) return `${minutes}m ago`
+    const hours = Math.floor(minutes / 60)
+    return `${hours}h ago`
+  })
+
+  // Check if schedules cache is valid
+  const isSchedulesCacheValid = (cityId) => {
+    try {
+      const timestamp = localStorage.getItem(`${SCHEDULES_CACHE_TIMESTAMP_KEY}_${cityId}`)
+      if (!timestamp) return false
+      const cacheAge = Date.now() - parseInt(timestamp, 10)
+      return cacheAge < SCHEDULES_CACHE_DURATION_MS
+    } catch {
+      return false
+    }
+  }
+
+  // Load schedules from cache
+  const loadSchedulesFromCache = (cityId) => {
+    try {
+      const cached = localStorage.getItem(`${SCHEDULES_CACHE_KEY}_${cityId}`)
+      if (cached) {
+        return JSON.parse(cached)
+      }
+    } catch (error) {
+      console.warn('Error reading schedules cache:', error)
+    }
+    return null
+  }
+
+  // Save schedules to cache
+  const saveSchedulesToCache = (cityId, schedulesData) => {
+    try {
+      localStorage.setItem(`${SCHEDULES_CACHE_KEY}_${cityId}`, JSON.stringify(schedulesData))
+      localStorage.setItem(`${SCHEDULES_CACHE_TIMESTAMP_KEY}_${cityId}`, Date.now().toString())
+    } catch (error) {
+      console.warn('Error saving schedules cache:', error)
+    }
+  }
+
+  // Load schedules for a specific city (with caching)
+  const loadSchedules = async (cityId, forceRefresh = false) => {
+    currentCityId.value = cityId || useCityStore().currentCityId
+
+    if (!currentCityId.value) {
+      console.warn('No city ID provided for schedules')
+      schedulesLoaded.value = true
+      return { success: false, error: 'No city ID' }
     }
 
-    return new Promise((resolve) => {
-      try {
-        const schedulesRef = collection(db, 'gameSchedules')
-        const q = query(schedulesRef, orderBy('order', 'asc'))
-        let isFirstSnapshot = true
-
-        unsubscribeSchedules = onSnapshot(q, (querySnapshot) => {
-          if (!querySnapshot.empty) {
-            const schedules = {}
-            querySnapshot.docs.forEach(doc => {
-              const data = doc.data()
-              if (data.isActive) {
-                schedules[doc.id] = {
-                  day: data.dayOfWeek,
-                  time: data.time,
-                  venue: data.venue
-                }
-              }
-            })
-            gameSchedules.value = schedules
-          }
-          schedulesLoaded.value = true
-
-          // Resolve the promise after first snapshot
-          if (isFirstSnapshot) {
-            isFirstSnapshot = false
-            resolve({ success: true })
-          }
-        }, (error) => {
-          // Fall back to defaults if Firestore fails
-          console.error('Error subscribing to schedules:', error)
-          schedulesLoaded.value = true
-          if (isFirstSnapshot) {
-            isFirstSnapshot = false
-            resolve({ success: false, error: error.message })
-          }
-        })
-      } catch (error) {
-        // Fall back to defaults if Firestore fails
+    // Try cache first (unless force refresh)
+    if (!forceRefresh && isSchedulesCacheValid(currentCityId.value)) {
+      const cachedSchedules = loadSchedulesFromCache(currentCityId.value)
+      if (cachedSchedules && Object.keys(cachedSchedules).length > 0) {
+        gameSchedules.value = cachedSchedules
         schedulesLoaded.value = true
-        resolve({ success: false, error: error.message })
+        return { success: true, fromCache: true }
       }
-    })
+    }
+
+    // Load from Firestore
+    try {
+      const schedulesRef = collection(db, 'gameSchedules')
+      const q = query(
+        schedulesRef,
+        where('cityId', '==', currentCityId.value),
+        orderBy('order', 'asc')
+      )
+      const querySnapshot = await getDocs(q)
+
+      const schedules = {}
+      querySnapshot.docs.forEach(docSnap => {
+        const data = docSnap.data()
+        if (data.isActive) {
+          schedules[docSnap.id] = {
+            day: data.dayOfWeek,
+            time: data.time,
+            venue: data.venue,
+            cityId: data.cityId
+          }
+        }
+      })
+
+      gameSchedules.value = schedules
+      schedulesLoaded.value = true
+
+      // Save to cache
+      saveSchedulesToCache(currentCityId.value, schedules)
+
+      return { success: true, fromCache: false }
+    } catch (error) {
+      console.error('Error loading schedules:', error)
+      schedulesLoaded.value = true
+
+      // Try stale cache as fallback
+      const staleCache = loadSchedulesFromCache(currentCityId.value)
+      if (staleCache) {
+        gameSchedules.value = staleCache
+        return { success: true, fromCache: true, stale: true }
+      }
+
+      return { success: false, error: error.message }
+    }
   }
+
+  // Legacy alias for backward compatibility
+  const subscribeToSchedules = (cityId) => loadSchedules(cityId)
 
   const stopSchedulesListener = () => {
-    if (unsubscribeSchedules) {
-      unsubscribeSchedules()
-      unsubscribeSchedules = null
-    }
+    // No longer needed but kept for backward compatibility
+    schedulesLoaded.value = false
+    gameSchedules.value = {}
   }
 
-  const getTodayGameId = () => {
+  // Get today's game ID for the current city
+  const getTodayGameId = (cityId) => {
+    const city = cityId || currentCityId.value
+    if (!city) return null
+
     const now = new Date()
     const dayOfWeek = now.getDay()
     const dateString = now.toISOString().split('T')[0]
 
     const schedules = gameSchedules.value
     const gameKey = Object.keys(schedules).find(key => {
-      return schedules[key].day === dayOfWeek
+      const schedule = schedules[key]
+      return schedule.day === dayOfWeek
     })
 
     return gameKey ? `${dateString}_${gameKey}` : null
   }
 
-  const getTodayGameScheduleKey = () => {
+  const getTodayGameScheduleKey = (cityId) => {
+    const city = cityId || currentCityId.value
+    if (!city) return null
+
     const now = new Date()
     const dayOfWeek = now.getDay()
 
     const schedules = gameSchedules.value
     return Object.keys(schedules).find(key => {
-      return schedules[key].day === dayOfWeek
+      const schedule = schedules[key]
+      return schedule.day === dayOfWeek
     })
   }
 
@@ -128,27 +202,26 @@ export const useGameStore = defineStore('game', () => {
     return hours >= 8 && hours < 18
   }
 
-  const loadTodayGame = async () => {
-    const gameId = getTodayGameId()
+  // Load today's game (no real-time listener)
+  const loadTodayGame = async (cityId) => {
+    const city = cityId || currentCityId.value
+    const gameId = getTodayGameId(city)
     if (!gameId) return null
-
-    if (unsubscribeGame) {
-      unsubscribeGame()
-    }
 
     loading.value = true
     try {
       const docRef = doc(db, 'games', gameId)
-
       const docSnap = await getDoc(docRef)
 
       if (!docSnap.exists()) {
-        const scheduleKey = getTodayGameScheduleKey()
+        // Create the game if it doesn't exist
+        const scheduleKey = getTodayGameScheduleKey(city)
         const schedule = gameSchedules.value[scheduleKey]
 
         const newGame = {
           date: new Date().toISOString().split('T')[0],
           scheduleKey: scheduleKey,
+          cityId: city,
           venue: schedule.venue,
           time: schedule.time,
           players: [],
@@ -157,32 +230,34 @@ export const useGameStore = defineStore('game', () => {
         }
 
         await setDoc(docRef, newGame)
+        currentGame.value = { id: gameId, ...newGame }
+      } else {
+        currentGame.value = { id: docSnap.id, ...docSnap.data() }
       }
 
-      unsubscribeGame = onSnapshot(docRef, (doc) => {
-        if (doc.exists()) {
-          currentGame.value = { id: doc.id, ...doc.data() }
-        }
-        loading.value = false
-      }, (error) => {
-        loading.value = false
-      })
-
+      lastRefreshed.value = Date.now()
+      loading.value = false
       return currentGame.value
     } catch (error) {
+      console.error('Error loading game:', error)
       loading.value = false
       return null
     }
   }
 
-  const stopGameListener = () => {
-    if (unsubscribeGame) {
-      unsubscribeGame()
-      unsubscribeGame = null
-    }
+  // Refresh game data (for pull-to-refresh)
+  const refreshGame = async (cityId) => {
+    const city = cityId || currentCityId.value
+    return loadTodayGame(city)
   }
 
-  const checkIn = async () => {
+  const stopGameListener = () => {
+    // No longer using listeners, but kept for backward compatibility
+    currentGame.value = null
+    lastRefreshed.value = null
+  }
+
+  const checkIn = async (cityId) => {
     const authStore = useAuthStore()
     if (!authStore.user || !authStore.userProfile) {
       return { success: false, error: 'Must be logged in' }
@@ -192,13 +267,44 @@ export const useGameStore = defineStore('game', () => {
       return { success: false, error: 'Check-in only allowed between 8 AM and 6 PM' }
     }
 
-    const gameId = getTodayGameId()
+    const city = cityId || currentCityId.value
+    const gameId = getTodayGameId(city)
     if (!gameId) {
       return { success: false, error: 'No game scheduled for today' }
     }
 
-    const scheduleKey = getTodayGameScheduleKey()
-    const isRegular = authStore.userProfile.regulars?.[scheduleKey] || false
+    // Check if user is already checked in to any game today (across all cities)
+    const todayDate = new Date().toISOString().split('T')[0]
+    try {
+      const gamesRef = collection(db, 'games')
+      const todayGamesQuery = query(gamesRef, where('date', '==', todayDate))
+      const todayGamesSnapshot = await getDocs(todayGamesQuery)
+
+      for (const gameDoc of todayGamesSnapshot.docs) {
+        const gameData = gameDoc.data()
+        const isInPlayers = gameData.players?.some(p => p.uid === authStore.user.uid)
+        const isInWaitlist = gameData.waitlist?.some(p => p.uid === authStore.user.uid)
+
+        if (isInPlayers || isInWaitlist) {
+          // User is already checked in to a game today
+          const otherCityId = gameData.cityId
+          if (otherCityId !== city) {
+            const cityStore = useCityStore()
+            const otherCity = cityStore.getCityById(otherCityId)
+            const cityName = otherCity?.name || otherCityId
+            return { success: false, error: `You are already checked in for a game in ${cityName} today. Please check out there first.` }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error checking for existing check-ins:', error)
+      // Continue with check-in if we can't verify (fail open for better UX)
+    }
+
+    const scheduleKey = getTodayGameScheduleKey(city)
+
+    // Check if user is a regular for this schedule (using city-scoped data)
+    const isRegular = authStore.isRegularForSchedule(scheduleKey, city)
 
     try {
       const docRef = doc(db, 'games', gameId)
@@ -221,19 +327,23 @@ export const useGameStore = defineStore('game', () => {
         })
       }
 
+      // Refresh game data after check-in
+      await refreshGame(city)
+
       return { success: true, isRegular }
     } catch (error) {
       return { success: false, error: error.message }
     }
   }
 
-  const checkOut = async () => {
+  const checkOut = async (cityId) => {
     const authStore = useAuthStore()
     if (!authStore.user) {
       return { success: false, error: 'Must be logged in' }
     }
 
-    const gameId = getTodayGameId()
+    const city = cityId || currentCityId.value
+    const gameId = getTodayGameId(city)
     if (!gameId) {
       return { success: false, error: 'No game scheduled for today' }
     }
@@ -255,14 +365,18 @@ export const useGameStore = defineStore('game', () => {
         })
       }
 
+      // Refresh game data after check-out
+      await refreshGame(city)
+
       return { success: true }
     } catch (error) {
       return { success: false, error: error.message }
     }
   }
 
-  const moveFromWaitlist = async (playerUid) => {
-    const gameId = getTodayGameId()
+  const moveFromWaitlist = async (playerUid, cityId) => {
+    const city = cityId || currentCityId.value
+    const gameId = getTodayGameId(city)
     if (!gameId) return { success: false, error: 'No game scheduled' }
 
     try {
@@ -278,6 +392,9 @@ export const useGameStore = defineStore('game', () => {
         waitlist: arrayRemove(player),
         players: arrayUnion(player)
       })
+
+      // Refresh game data after moving player
+      await refreshGame(city)
 
       return { success: true }
     } catch (error) {
@@ -367,23 +484,36 @@ export const useGameStore = defineStore('game', () => {
     return { darkTeam, lightTeam }
   }
 
+  // Set current city (for use when city changes)
+  const setCurrentCity = (cityId) => {
+    currentCityId.value = cityId
+  }
+
   return {
     games,
     currentGame,
+    currentCityId,
     loading,
     schedulesLoaded,
     gameSchedules,
     GAME_SCHEDULES,
-    subscribeToSchedules,
+    lastRefreshed,
+    isDataStale,
+    timeSinceRefresh,
+    loadSchedules,
+    subscribeToSchedules, // Legacy alias
     stopSchedulesListener,
     getTodayGameId,
+    getTodayGameScheduleKey,
     isCheckInAllowed,
     loadTodayGame,
+    refreshGame,
     stopGameListener,
     checkIn,
     checkOut,
     moveFromWaitlist,
     userCheckedIn,
-    balanceTeams
+    balanceTeams,
+    setCurrentCity
   }
 })

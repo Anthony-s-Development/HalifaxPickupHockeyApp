@@ -19,7 +19,7 @@ const config: CapacitorConfig = {
       iosSpinnerStyle: "small",
       spinnerColor: "#999999"
     },
-  }
-  };
+  },
+};
 
 export default config;

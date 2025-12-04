@@ -1,0 +1,28 @@
+#TODO: When the user checks in, if they don't have a skate pass, and they are moved to a roster, or are on the roster, they should be able to pay for the skate at that point. 
+
+
+#below needed for moving the payment system to prod and not test. 
+
+# 2. Set up Stripe secrets in Firebase
+# firebase functions:secrets:set STRIPE_SECRET_KEY
+# # Enter your Stripe secret key (starts with sk_)
+
+# firebase functions:secrets:set STRIPE_WEBHOOK_SECRET
+# # Enter your webhook signing secret (you'll get this after step 4)
+# 3. Deploy Cloud Functions
+# firebase deploy --only functions
+
+# 4. Configure Stripe Webhook
+# In your Stripe Dashboard:
+# Go to Developers → Webhooks
+# Add endpoint: https://us-central1-halifaxpickuphockey-50910.cloudfunctions.net/stripeWebhook
+# Select event: checkout.session.completed
+# Copy the signing secret and set it using the command in step 2
+
+# 5. Test with Stripe test mode
+# Use test card: 4242 4242 4242 4242 with any future date and CVC
+
+
+
+# Endpoint URL: https://us-central1-halifaxpickuphockey-50910.cloudfunctions.net/stripeWebhook
+# Events: checkout.session.completed, checkout.session.async_payment_succeeded, checkout.session.async_payment_failed

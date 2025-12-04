@@ -1,6 +1,7 @@
 import { initializeApp } from 'firebase/app'
 import { getAuth } from 'firebase/auth'
 import { getFirestore } from 'firebase/firestore'
+import { getFunctions } from 'firebase/functions'
 import { Capacitor } from '@capacitor/core'
 
 const firebaseConfig = {
@@ -14,6 +15,11 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig)
 
+// Only initialize Firebase Auth on web - on native, Capacitor plugin handles auth
+// This avoids CORS/gapi errors in the Capacitor webview
 export const auth = Capacitor.isNativePlatform() ? null : getAuth(app)
 
 export const db = getFirestore(app)
+
+// Initialize Firebase Functions
+export const functions = getFunctions(app)

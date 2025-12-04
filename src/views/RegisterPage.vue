@@ -14,93 +14,113 @@
         <h1>Create Account</h1>
 
         <form @submit.prevent="handleRegister">
-          <ion-item>
-            <ion-label position="floating">Name</ion-label>
-            <ion-input
-              v-model="name"
-              type="text"
-              required
-              autocomplete="name"
-            ></ion-input>
-          </ion-item>
+          <ion-input
+            v-model="name"
+            type="text"
+            label="Full Name"
+            label-placement="stacked"
+            placeholder="Enter your first and last name"
+            required
+            autocomplete="name"
+            fill="outline"
+            class="form-input"
+          ></ion-input>
 
-          <ion-item>
-            <ion-label position="floating">Email</ion-label>
-            <ion-input
-              v-model="email"
-              type="email"
-              required
-              autocomplete="email"
-            ></ion-input>
-          </ion-item>
+          <ion-input
+            v-model="email"
+            type="email"
+            label="Email Address"
+            label-placement="stacked"
+            placeholder="Enter your email"
+            required
+            autocomplete="email"
+            fill="outline"
+            class="form-input"
+          ></ion-input>
 
-          <ion-item>
-            <ion-label position="floating">Password</ion-label>
-            <ion-input
-              v-model="password"
-              type="password"
-              required
-              autocomplete="new-password"
-            ></ion-input>
-          </ion-item>
+          <ion-input
+            v-model="password"
+            type="password"
+            label="Password"
+            label-placement="stacked"
+            placeholder="Create a password (min 6 characters)"
+            required
+            autocomplete="new-password"
+            fill="outline"
+            class="form-input"
+          ></ion-input>
 
-          <ion-item>
-            <ion-label position="floating">Position</ion-label>
-            <ion-select v-model="position" interface="popover">
-              <ion-select-option value="Forward">Forward</ion-select-option>
-              <ion-select-option value="Defense">Defense</ion-select-option>
-              <ion-select-option value="Goalie">Goalie</ion-select-option>
-            </ion-select>
-          </ion-item>
+          <ion-select
+            v-model="selectedCityId"
+            label="Home City"
+            label-placement="stacked"
+            placeholder="Select your home city"
+            interface="action-sheet"
+            fill="outline"
+            class="form-input"
+          >
+            <ion-select-option
+              v-for="city in cityStore.activeCities"
+              :key="city.id"
+              :value="city.id"
+            >
+              {{ city.displayName }}
+            </ion-select-option>
+          </ion-select>
+
+          <ion-select
+            v-model="position"
+            label="Position"
+            label-placement="stacked"
+            placeholder="Select your position"
+            interface="action-sheet"
+            fill="outline"
+            class="form-input"
+          >
+            <ion-select-option value="Forward">Forward</ion-select-option>
+            <ion-select-option value="Defense">Defense</ion-select-option>
+            <ion-select-option value="Goalie">Goalie</ion-select-option>
+          </ion-select>
 
           <div class="skill-level-section">
             <h3>Skill Level</h3>
             <p class="section-description">Select your skill level</p>
 
             <ion-radio-group v-model="skillLevel">
-              <ion-item>
-                <ion-label class="skill-label">
-                  <h2>Level 1</h2>
-                  <p>
-                    Basic skating ability but struggles with backward skating
-                    and crossovers
-                  </p>
-                </ion-label>
-                <ion-radio slot="start" :value="1"></ion-radio>
-              </ion-item>
+              <div class="skill-option" :class="{ selected: skillLevel === 1 }" @click="skillLevel = 1">
+                <ion-radio :value="1" label-placement="end"></ion-radio>
+                <div class="skill-content">
+                  <span class="skill-title">Level 1</span>
+                  <span class="skill-desc">Basic skating ability but struggles with backward skating and crossovers</span>
+                </div>
+              </div>
 
-              <ion-item>
-                <ion-label class="skill-label">
-                  <h2>Level 2</h2>
-                  <p>
-                    A good mix of basic skills, decent knowledge of the game,
-                    and athletic ability
-                  </p>
-                </ion-label>
-                <ion-radio slot="start" :value="2"></ion-radio>
-              </ion-item>
+              <div class="skill-option" :class="{ selected: skillLevel === 2 }" @click="skillLevel = 2">
+                <ion-radio :value="2" label-placement="end"></ion-radio>
+                <div class="skill-content">
+                  <span class="skill-title">Level 2</span>
+                  <span class="skill-desc">A good mix of basic skills, decent knowledge of the game, and athletic ability</span>
+                </div>
+              </div>
 
-              <ion-item>
-                <ion-label class="skill-label">
-                  <h2>Level 3</h2>
-                  <p>
-                    Advanced skills, strong physical shape, and a high
-                    understanding of the game
-                  </p>
-                </ion-label>
-                <ion-radio slot="start" :value="3"></ion-radio>
-              </ion-item>
+              <div class="skill-option" :class="{ selected: skillLevel === 3 }" @click="skillLevel = 3">
+                <ion-radio :value="3" label-placement="end"></ion-radio>
+                <div class="skill-content">
+                  <span class="skill-title">Level 3</span>
+                  <span class="skill-desc">Advanced skills, strong physical shape, and a high understanding of the game</span>
+                </div>
+              </div>
             </ion-radio-group>
           </div>
 
           <ion-button
             type="submit"
             expand="block"
-            class="ion-margin-top"
-            :disabled="loading"
+            class="submit-button"
+            :disabled="loading || !selectedCityId"
           >
             <ion-spinner v-if="loading" />
-            <span v-else>Register</span>
+            <span v-else>Create Account</span>
           </ion-button>
         </form>
 
@@ -127,31 +147,46 @@ import {
   IonButton,
   IonButtons,
   IonBackButton,
-  IonItem,
-  IonLabel,
   IonInput,
   IonSelect,
   IonSelectOption,
   IonRadio,
   IonRadioGroup,
   IonText,
-  IonNote,
   IonSpinner,
   toastController,
 } from "@ionic/vue";
-import { ref } from "vue";
+import { ref, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
+import { useCityStore } from "@/stores/city";
 
 const router = useRouter();
 const authStore = useAuthStore();
+const cityStore = useCityStore();
 
 const name = ref("");
 const email = ref("");
 const password = ref("");
+const selectedCityId = ref("");
 const position = ref("Forward");
 const skillLevel = ref(2);
 const loading = ref(false);
+
+onMounted(async () => {
+  // Load cities if not already loaded
+  if (!cityStore.citiesLoaded) {
+    await cityStore.loadCities();
+  }
+
+  // Default to first active city or last visited city
+  const lastCityId = cityStore.getLastCityId();
+  if (lastCityId && cityStore.getCityById(lastCityId)) {
+    selectedCityId.value = lastCityId;
+  } else if (cityStore.activeCities.length > 0) {
+    selectedCityId.value = cityStore.activeCities[0].id;
+  }
+});
 
 const handleRegister = async () => {
   if (password.value.length < 6) {
@@ -164,11 +199,22 @@ const handleRegister = async () => {
     return;
   }
 
+  if (!selectedCityId.value) {
+    const toast = await toastController.create({
+      message: "Please select a home city",
+      duration: 3000,
+      color: "danger",
+    });
+    await toast.present();
+    return;
+  }
+
   loading.value = true;
   const result = await authStore.register(email.value, password.value, {
     name: name.value,
     position: position.value,
     skillLevel: skillLevel.value,
+    cityId: selectedCityId.value,
   });
   loading.value = false;
 
@@ -179,7 +225,8 @@ const handleRegister = async () => {
       color: "success",
     });
     await toast.present();
-    router.push("/");
+    // Navigate to the selected city's home page
+    router.push(`/${selectedCityId.value}`);
   } else {
     const toast = await toastController.create({
       message: result.error || "Registration failed",
@@ -195,41 +242,103 @@ const handleRegister = async () => {
 .register-container {
   max-width: 500px;
   margin: 0 auto;
+  padding-top: 1rem;
 }
 
 h1 {
   text-align: center;
-  margin-bottom: 2rem;
+  margin-bottom: 1.5rem;
+  font-size: 24px;
+  font-weight: 600;
 }
 
 form {
-  margin-bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.form-input {
+  --border-radius: 8px;
+  --highlight-color-focused: var(--ion-color-primary);
 }
 
 .skill-level-section {
-  margin-top: 2rem;
+  margin-top: 8px;
 }
 
 .skill-level-section h3 {
-  margin-bottom: 0.5rem;
-  padding-left: 1rem;
-}
-
-.skill-label p {
-  white-space: normal;
-  font-size: 0.85rem;
+  margin: 0 0 4px 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ion-color-medium);
 }
 
 .section-description {
   color: var(--ion-color-medium);
-  font-size: 0.9rem;
-  padding-left: 1rem;
-  margin-bottom: 1rem;
+  font-size: 13px;
+  margin: 0 0 12px 0;
+}
+
+ion-radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.skill-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--ion-color-light-shade);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.skill-option:hover {
+  border-color: var(--ion-color-primary);
+  background: rgba(var(--ion-color-primary-rgb), 0.05);
+}
+
+.skill-option.selected {
+  border-color: var(--ion-color-primary);
+  background: rgba(var(--ion-color-primary-rgb), 0.1);
+}
+
+.skill-option ion-radio {
+  margin-top: 2px;
+}
+
+.skill-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.skill-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ion-text-color);
+}
+
+.skill-desc {
+  font-size: 13px;
+  color: var(--ion-color-medium);
+  line-height: 1.4;
+}
+
+.submit-button {
+  margin-top: 8px;
+  --border-radius: 8px;
+  font-weight: 600;
 }
 
 .login-link {
   text-align: center;
-  margin-top: 1rem;
+  margin-top: 1.5rem;
 }
 
 .login-link a {
